@@ -1,0 +1,20 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ReportSnapshot {
+  id          String   @id @default(cuid())
+  periodStart DateTime
+  periodEnd   DateTime
+  metricsJson Json
+  filesMeta   Json
+  createdAt   DateTime @default(now())
+
+  @@index([periodEnd])
+  @@index([periodStart])
+}
