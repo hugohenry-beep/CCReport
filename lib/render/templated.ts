@@ -59,6 +59,28 @@ export function renderTemplatedMarkdown(m: Metrics): string {
   }
   lines.push(``);
 
+  // 3b. Country breakdown
+  lines.push(`## Inbound leads by country`);
+  lines.push(``);
+  const currentByCountry = c.byCountry ?? [];
+  const priorByCountry = p?.byCountry ?? [];
+  if (currentByCountry.length === 0) {
+    lines.push(`_No country data available._`);
+  } else {
+    const priorCounts = new Map(priorByCountry.map((r) => [r.country, r.count]));
+    lines.push(`| Country | Count | % of total | Prior | Δ vs prior |`);
+    lines.push(`| --- | ---: | ---: | ---: | --- |`);
+    for (const row of currentByCountry) {
+      const prior = priorCounts.get(row.country) ?? 0;
+      lines.push(
+        `| ${row.country} | ${fmtNumber(row.count)} | ${fmtPct(row.pct)} | ${
+          p ? fmtNumber(prior) : "—"
+        } | ${countryDelta(row.count, prior, p != null)} |`,
+      );
+    }
+  }
+  lines.push(``);
+
   // 4. Spend vs results
   lines.push(`## Budget spend vs results`);
   lines.push(``);
@@ -145,4 +167,13 @@ function periodSummaryParagraph(c: PeriodMetrics, p: PeriodMetrics): string {
 function pctChange(curr: number, prior: number): number {
   if (!prior) return 0;
   return ((curr - prior) / prior) * 100;
+}
+
+function countryDelta(curr: number, prior: number, hasPrior: boolean): string {
+  if (!hasPrior) return "—";
+  if (prior === 0) return curr > 0 ? "(new)" : "→ 0";
+  const change = ((curr - prior) / prior) * 100;
+  const arrow = change > 0 ? "▲" : change < 0 ? "▼" : "→";
+  const sign = change > 0 ? "+" : "";
+  return `${arrow} ${sign}${change.toFixed(1)}%`;
 }

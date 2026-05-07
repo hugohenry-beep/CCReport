@@ -86,6 +86,47 @@ function ReportPdf({ metrics }: { metrics: Metrics }) {
           </View>
         )}
 
+        <Text style={styles.h2}>Inbound leads by country</Text>
+        {(() => {
+          const cur = c.byCountry ?? [];
+          if (cur.length === 0) {
+            return <Text style={styles.p}>No country data available.</Text>;
+          }
+          const priorMap = new Map((p?.byCountry ?? []).map((r) => [r.country, r.count]));
+          return (
+            <View style={styles.table}>
+              <View style={styles.row}>
+                <Text style={styles.th}>Country</Text>
+                <Text style={styles.th}>Count</Text>
+                <Text style={styles.th}>% total</Text>
+                <Text style={styles.th}>Prior</Text>
+                <Text style={styles.th}>Δ vs prior</Text>
+              </View>
+              {cur.map((r, i) => {
+                const prior = priorMap.get(r.country) ?? 0;
+                let deltaLabel: string;
+                if (!p) deltaLabel = "—";
+                else if (prior === 0) deltaLabel = r.count > 0 ? "(new)" : "→ 0";
+                else {
+                  const change = ((r.count - prior) / prior) * 100;
+                  const arrow = change > 0 ? "▲" : change < 0 ? "▼" : "→";
+                  const sign = change > 0 ? "+" : "";
+                  deltaLabel = `${arrow} ${sign}${change.toFixed(1)}%`;
+                }
+                return (
+                  <View style={styles.row} key={i}>
+                    <Text style={styles.td}>{r.country}</Text>
+                    <Text style={styles.td}>{fmtNumber(r.count)}</Text>
+                    <Text style={styles.td}>{fmtPct(r.pct)}</Text>
+                    <Text style={styles.td}>{p ? fmtNumber(prior) : "—"}</Text>
+                    <Text style={styles.td}>{deltaLabel}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          );
+        })()}
+
         <Text style={styles.h2}>Budget spend vs results</Text>
         <View style={styles.table}>
           <View style={styles.row}>

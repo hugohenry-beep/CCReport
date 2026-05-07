@@ -1,5 +1,6 @@
 import type {
   ComparisonInfo,
+  CountryBreakdown,
   DateRange,
   Deal,
   HighValueDeal,
@@ -68,6 +69,7 @@ function computeForPeriod(datasets: ParsedDatasets, range: DateRange): PeriodMet
 
   const bySource = breakdownBySource(leadsInRange);
   const byStage = breakdownByLeadStage(leadsInRange);
+  const byCountry = breakdownByCountry(leadsInRange);
 
   const adSpend = datasets.campaigns.reduce((s, c) => s + (c.cost || 0), 0);
 
@@ -101,6 +103,7 @@ function computeForPeriod(datasets: ParsedDatasets, range: DateRange): PeriodMet
     inboundLeadCount,
     bySource,
     byStage,
+    byCountry,
     adSpend,
     totalDealValue,
     costPerLead,
@@ -139,6 +142,18 @@ function breakdownBySource(leads: Lead[]): SourceBreakdown[] {
   const total = leads.length || 1;
   return Array.from(counts.entries())
     .map(([source, count]) => ({ source, count, pct: (count / total) * 100 }))
+    .sort((a, b) => b.count - a.count);
+}
+
+function breakdownByCountry(leads: Lead[]): CountryBreakdown[] {
+  const counts = new Map<string, number>();
+  for (const l of leads) {
+    if (!l.country) continue;
+    counts.set(l.country, (counts.get(l.country) ?? 0) + 1);
+  }
+  const total = leads.length || 1;
+  return Array.from(counts.entries())
+    .map(([country, count]) => ({ country, count, pct: (count / total) * 100 }))
     .sort((a, b) => b.count - a.count);
 }
 

@@ -85,6 +85,12 @@ export interface StageBreakdown {
   pct: number;
 }
 
+export interface CountryBreakdown {
+  country: string;
+  count: number;
+  pct: number;
+}
+
 export interface HighValueDeal {
   dealName: string;
   company: string;
@@ -97,6 +103,7 @@ export interface PeriodMetrics {
   inboundLeadCount: number;
   bySource: SourceBreakdown[];
   byStage: StageBreakdown[];
+  byCountry: CountryBreakdown[];
   adSpend: number;
   totalDealValue: number;
   costPerLead: number | null;
