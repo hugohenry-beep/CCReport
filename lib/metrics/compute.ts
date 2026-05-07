@@ -67,9 +67,7 @@ function computeForPeriod(datasets: ParsedDatasets, range: DateRange): PeriodMet
   const inboundLeadCount = uniqueById(leadsInRange).length;
 
   const bySource = breakdownBySource(leadsInRange);
-  const byStage = breakdownByStage(
-    datasets.leadStageDeals.filter((d) => inRange(d.createDate, range)),
-  );
+  const byStage = breakdownByLeadStage(leadsInRange);
 
   const adSpend = datasets.campaigns.reduce((s, c) => s + (c.cost || 0), 0);
 
@@ -144,13 +142,13 @@ function breakdownBySource(leads: Lead[]): SourceBreakdown[] {
     .sort((a, b) => b.count - a.count);
 }
 
-function breakdownByStage(deals: Deal[]): StageBreakdown[] {
+function breakdownByLeadStage(leads: Lead[]): StageBreakdown[] {
   const counts = new Map<string, number>();
-  for (const d of deals) {
-    const s = d.dealStage ?? "Unknown";
-    counts.set(s, (counts.get(s) ?? 0) + 1);
+  for (const l of leads) {
+    if (!l.leadStage) continue;
+    counts.set(l.leadStage, (counts.get(l.leadStage) ?? 0) + 1);
   }
-  const total = deals.length || 1;
+  const total = leads.length || 1;
   return Array.from(counts.entries())
     .map(([stage, count]) => ({ stage, count, pct: (count / total) * 100 }))
     .sort((a, b) => b.count - a.count);
