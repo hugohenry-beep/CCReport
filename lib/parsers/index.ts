@@ -140,6 +140,7 @@ export function parseAll(uploads: NamedFile[]): ParsedDatasets {
   const dedupedPaidPipe = dedupeDealsById(paidPipeDeals);
   const dedupedLeadStage = dedupeDealsById(leadStageDeals);
   const dedupedRegional = dedupeDealsById(regionalDeals);
+  const dedupedCampaigns = dedupeCampaignsByName(campaigns);
 
   return {
     leads: dedupedLeads,
@@ -147,11 +148,19 @@ export function parseAll(uploads: NamedFile[]): ParsedDatasets {
     paidPipeDeals: dedupedPaidPipe,
     closedWonDeals: dedupedClosedWon,
     regionalDeals: dedupedRegional,
-    campaigns,
+    campaigns: dedupedCampaigns,
     adsPeriodLabel,
     files,
     warnings,
   };
+}
+
+function dedupeCampaignsByName(campaigns: Campaign[]): Campaign[] {
+  const seen = new Map<string, Campaign>();
+  for (const c of campaigns) {
+    if (!seen.has(c.campaign)) seen.set(c.campaign, c);
+  }
+  return Array.from(seen.values());
 }
 
 function dedupeLeadsByIdAndDate(leads: Lead[]): Lead[] {
