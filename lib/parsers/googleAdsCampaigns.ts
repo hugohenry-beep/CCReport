@@ -16,9 +16,12 @@ export function parseGoogleAdsCampaigns(buf: Buffer): GoogleAdsResult {
 
   const campaigns: Campaign[] = [];
   for (const row of rows) {
+    const status = getString(row, "Campaign status");
+    if (status && /^total\b/i.test(status)) continue;
     const campaign = getString(row, "Campaign");
     if (!campaign) continue;
-    if (/^total/i.test(campaign)) continue;
+    if (/^total\b/i.test(campaign)) continue;
+    if (/^-+$/.test(campaign)) continue;
     campaigns.push({
       campaign,
       cost: getNumber(row, "Cost", "Avg. cost") ?? 0,
