@@ -12,6 +12,9 @@ export async function POST(req: NextRequest) {
     const form = await req.formData();
     const startStr = form.get("periodStart");
     const endStr = form.get("periodEnd");
+    const nameRaw = form.get("name");
+    const name =
+      typeof nameRaw === "string" && nameRaw.trim() !== "" ? nameRaw.trim() : null;
     if (typeof startStr !== "string" || typeof endStr !== "string") {
       return NextResponse.json({ error: "Missing periodStart or periodEnd" }, { status: 400 });
     }
@@ -56,7 +59,7 @@ export async function POST(req: NextRequest) {
         : null,
     });
 
-    const saved = await saveSnapshot(metrics, datasets.files);
+    const saved = await saveSnapshot(metrics, datasets.files, name);
 
     return NextResponse.json({ id: saved.id });
   } catch (err) {

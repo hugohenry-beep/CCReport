@@ -9,6 +9,7 @@ export async function GET() {
     return NextResponse.json(
       snaps.map((s) => ({
         id: s.id,
+        name: s.name,
         periodStart: s.periodStart.toISOString(),
         periodEnd: s.periodEnd.toISOString(),
         createdAt: s.createdAt.toISOString(),

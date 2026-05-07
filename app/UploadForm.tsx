@@ -6,6 +6,7 @@ import { useState } from "react";
 export default function UploadForm() {
   const router = useRouter();
   const [files, setFiles] = useState<File[]>([]);
+  const [name, setName] = useState<string>("");
   const [periodStart, setPeriodStart] = useState<string>(defaultStart());
   const [periodEnd, setPeriodEnd] = useState<string>(defaultEnd());
   const [busy, setBusy] = useState(false);
@@ -30,6 +31,7 @@ export default function UploadForm() {
       const endDate = new Date(periodEnd);
       endDate.setHours(23, 59, 59, 999);
       fd.set("periodEnd", endDate.toISOString());
+      if (name.trim() !== "") fd.set("name", name.trim());
       files.forEach((f, i) => fd.append(`file_${i}`, f));
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       if (!res.ok) {
@@ -65,6 +67,17 @@ export default function UploadForm() {
             ))}
           </ul>
         )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1">Report name (optional)</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Q1 2026 paid pipeline"
+          className="w-full px-3 py-2 rounded bg-[var(--panel-2)] border border-[var(--border)] text-sm"
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4">

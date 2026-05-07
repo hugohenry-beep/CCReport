@@ -28,6 +28,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       reportId={id}
       initialHtml={html}
       initialMarkdown={md}
+      initialName={snap.name}
       meta={{
         period: fmtDateRange(metrics.periodStart, metrics.periodEnd),
         priorPeriod: fmtDateRange(metrics.priorPeriodStart, metrics.priorPeriodEnd),

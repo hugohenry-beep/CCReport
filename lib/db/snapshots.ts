@@ -1,9 +1,10 @@
 import type { Metrics, PeriodMetrics } from "../types";
 import { prisma } from "./client";
 
-export async function saveSnapshot(metrics: Metrics, filesMeta: unknown) {
+export async function saveSnapshot(metrics: Metrics, filesMeta: unknown, name?: string | null) {
   return prisma.reportSnapshot.create({
     data: {
+      name: name ?? null,
       periodStart: new Date(metrics.periodStart),
       periodEnd: new Date(metrics.periodEnd),
       metricsJson: metrics as unknown as object,
@@ -14,6 +15,17 @@ export async function saveSnapshot(metrics: Metrics, filesMeta: unknown) {
 
 export async function getSnapshot(id: string) {
   return prisma.reportSnapshot.findUnique({ where: { id } });
+}
+
+export async function updateSnapshot(id: string, data: { name: string | null }) {
+  return prisma.reportSnapshot.update({
+    where: { id },
+    data: { name: data.name },
+  });
+}
+
+export async function deleteSnapshot(id: string) {
+  return prisma.reportSnapshot.delete({ where: { id } });
 }
 
 export async function findPriorSnapshot(currentPeriodStart: Date) {

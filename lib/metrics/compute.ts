@@ -61,7 +61,9 @@ export function compute(datasets: ParsedDatasets, opts: ComputeOptions): Metrics
 }
 
 function computeForPeriod(datasets: ParsedDatasets, range: DateRange): PeriodMetrics {
-  const leadsInRange = datasets.leads.filter((l) => inRange(l.createDate, range));
+  const leadsInRange = datasets.leads
+    .filter((l) => inRange(l.createDate, range))
+    .filter((l) => l.source != null && l.source.trim() !== "");
   const inboundLeadCount = uniqueById(leadsInRange).length;
 
   const bySource = breakdownBySource(leadsInRange);
@@ -132,18 +134,14 @@ function uniqueById<T extends { id: string }>(rows: T[]): T[] {
 
 function breakdownBySource(leads: Lead[]): SourceBreakdown[] {
   const counts = new Map<string, number>();
-  let withSource = 0;
   for (const l of leads) {
-    const s = l.source ?? "Unknown";
-    if (l.source) withSource++;
-    counts.set(s, (counts.get(s) ?? 0) + 1);
+    if (!l.source) continue;
+    counts.set(l.source, (counts.get(l.source) ?? 0) + 1);
   }
   const total = leads.length || 1;
-  // If most leads lack source attribution, still show what we have but the row is informative.
-  const out: SourceBreakdown[] = Array.from(counts.entries())
+  return Array.from(counts.entries())
     .map(([source, count]) => ({ source, count, pct: (count / total) * 100 }))
     .sort((a, b) => b.count - a.count);
-  return out;
 }
 
 function breakdownByStage(deals: Deal[]): StageBreakdown[] {

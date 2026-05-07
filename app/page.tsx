@@ -1,7 +1,6 @@
 import { listRecentSnapshots } from "@/lib/db/snapshots";
 import UploadForm from "./UploadForm";
-import { fmtDateRange } from "@/lib/render/format";
-import Link from "next/link";
+import ReportListItem from "./ReportListItem";
 
 export const dynamic = "force-dynamic";
 
@@ -38,17 +37,14 @@ export default async function HomePage() {
         ) : (
           <ul className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-md overflow-hidden bg-[var(--panel)]">
             {recent.map((s) => (
-              <li key={s.id}>
-                <Link
-                  href={`/report/${s.id}`}
-                  className="flex items-center justify-between px-4 py-3 hover:bg-[var(--panel-2)]"
-                >
-                  <span className="text-sm">{fmtDateRange(s.periodStart.toISOString(), s.periodEnd.toISOString())}</span>
-                  <span className="text-xs text-[var(--text-muted)]">
-                    Generated {new Date(s.createdAt).toLocaleString()}
-                  </span>
-                </Link>
-              </li>
+              <ReportListItem
+                key={s.id}
+                id={s.id}
+                name={s.name}
+                periodStart={s.periodStart.toISOString()}
+                periodEnd={s.periodEnd.toISOString()}
+                createdAt={s.createdAt.toISOString()}
+              />
             ))}
           </ul>
         )}
