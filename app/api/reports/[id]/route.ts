@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { deleteSnapshot, updateSnapshot } from "@/lib/db/snapshots";
 
 export const runtime = "nodejs";
+
+function isRecordNotFound(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025";
+}
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -18,6 +23,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       createdAt: updated.createdAt.toISOString(),
     });
   } catch (err) {
+    if (isRecordNotFound(err)) {
+      return NextResponse.json({ error: "Report not found" }, { status: 404 });
+    }
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
@@ -29,6 +37,9 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     await deleteSnapshot(id);
     return NextResponse.json({ ok: true });
   } catch (err) {
+    if (isRecordNotFound(err)) {
+      return NextResponse.json({ error: "Report not found" }, { status: 404 });
+    }
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
