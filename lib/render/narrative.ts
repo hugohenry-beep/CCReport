@@ -33,7 +33,8 @@ ${JSON.stringify(metrics, null, 2)}`;
       { role: "system", content: system },
       { role: "user", content: user },
     ],
-    temperature: 0.4,
+    // Note: omit `temperature` — newer reasoning models (gpt-5.x, o-series)
+    // only accept the default of 1 and 400 on any other value.
   });
 
   const content = completion.choices[0]?.message?.content?.trim();
