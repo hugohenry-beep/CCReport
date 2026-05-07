@@ -23,9 +23,13 @@ export async function POST(req: NextRequest) {
 
     const namedFiles: NamedFile[] = [];
     for (const [, value] of form.entries()) {
-      if (value instanceof File) {
-        const buf = Buffer.from(await value.arrayBuffer());
-        namedFiles.push({ name: value.name, buffer: buf });
+      // Avoid `instanceof File` — `File` is not a global on Node < 20.
+      // Duck-type instead: anything that's not a string and has `arrayBuffer()` is a Blob/File.
+      if (typeof value === "string") continue;
+      if (value && typeof (value as Blob).arrayBuffer === "function") {
+        const buf = Buffer.from(await (value as Blob).arrayBuffer());
+        const name = (value as Blob & { name?: string }).name ?? "uploaded.xlsx";
+        namedFiles.push({ name, buffer: buf });
       }
     }
 
