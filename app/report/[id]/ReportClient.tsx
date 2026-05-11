@@ -179,6 +179,12 @@ export default function ReportClient({ reportId, initialHtml, initialMarkdown, i
         >
           Download PDF
         </a>
+        <a
+          href={`/report/${reportId}/xlsx`}
+          className="px-3 py-1.5 rounded bg-[var(--panel-2)] border border-[var(--border)] text-sm hover:bg-[var(--panel)]"
+        >
+          Download Excel
+        </a>
         <button
           onClick={copyMarkdown}
           className="px-3 py-1.5 rounded bg-[var(--panel-2)] border border-[var(--border)] text-sm hover:bg-[var(--panel)]"
