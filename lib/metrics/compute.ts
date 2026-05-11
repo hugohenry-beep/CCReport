@@ -1,6 +1,10 @@
 import type {
+  Campaign,
+  ChannelMetrics,
   ComparisonInfo,
   CountryBreakdown,
+  CountryChannelRow,
+  CountryKey,
   DateRange,
   Deal,
   HighValueDeal,
@@ -13,6 +17,13 @@ import type {
 } from "../types";
 import { HIGH_VALUE_THRESHOLD } from "../types";
 import { matchStage } from "./matchStage";
+import {
+  COUNTRY_ORDER,
+  classifyCampaignChannel,
+  classifyCampaignCountry,
+  classifyLeadChannel,
+  classifyLeadCountry,
+} from "./paidMediaClassification";
 
 export interface ComputeOptions {
   range: DateRange;
@@ -62,9 +73,8 @@ export function compute(datasets: ParsedDatasets, opts: ComputeOptions): Metrics
 }
 
 function computeForPeriod(datasets: ParsedDatasets, range: DateRange): PeriodMetrics {
-  const leadsInRange = datasets.leads
-    .filter((l) => inRange(l.createDate, range))
-    .filter((l) => l.source != null && l.source.trim() !== "");
+  const leadsInRangeAll = datasets.leads.filter((l) => inRange(l.createDate, range));
+  const leadsInRange = leadsInRangeAll.filter((l) => l.source != null && l.source.trim() !== "");
   const inboundLeadCount = uniqueById(leadsInRange).length;
 
   const bySource = breakdownBySource(leadsInRange);
@@ -72,6 +82,9 @@ function computeForPeriod(datasets: ParsedDatasets, range: DateRange): PeriodMet
   const byCountry = breakdownByCountry(leadsInRange);
 
   const adSpend = datasets.campaigns.reduce((s, c) => s + (c.cost || 0), 0);
+
+  const { rows: paidMediaByCountry, unclassified: unclassifiedCampaigns } =
+    buildPaidMediaByCountry(datasets.campaigns, leadsInRangeAll);
 
   const dealsInRange = datasets.paidPipeDeals.filter((d) => inRange(d.createDate, range));
   const totalDealValue = dealsInRange.reduce((s, d) => s + (d.amount ?? 0), 0);
@@ -113,7 +126,56 @@ function computeForPeriod(datasets: ParsedDatasets, range: DateRange): PeriodMet
     negotiatingCount,
     enteredContractLiveCount: enteredContractLive.length,
     enteredContractLiveDeals: enteredContractLive.map(toHighValue),
+    paidMediaByCountry,
+    unclassifiedCampaigns,
   };
+}
+
+function emptyChannelMetrics(): ChannelMetrics {
+  return { spend: 0, clicks: 0, impressions: 0, paidConversions: 0, inboundLeads: 0 };
+}
+
+function buildPaidMediaByCountry(
+  campaigns: Campaign[],
+  leadsInRange: Lead[],
+): { rows: CountryChannelRow[]; unclassified: string[] } {
+  const rowsByKey = new Map<CountryKey, CountryChannelRow>();
+  for (const key of COUNTRY_ORDER) {
+    rowsByKey.set(key, {
+      country: key,
+      paidSearch: emptyChannelMetrics(),
+      display: emptyChannelMetrics(),
+    });
+  }
+
+  const unclassified = new Set<string>();
+  for (const c of campaigns) {
+    const country = classifyCampaignCountry(c.campaign);
+    if (!country) {
+      unclassified.add(c.campaign);
+      continue;
+    }
+    const channel = classifyCampaignChannel(c.campaignType);
+    const row = rowsByKey.get(country)!;
+    const bucket = row[channel];
+    bucket.spend += c.cost || 0;
+    bucket.clicks += c.clicks || 0;
+    bucket.impressions += c.impressions || 0;
+    bucket.paidConversions += c.conversions || 0;
+  }
+
+  const seenLeadIds = new Set<string>();
+  for (const l of leadsInRange) {
+    if (seenLeadIds.has(l.id)) continue;
+    seenLeadIds.add(l.id);
+    const country = classifyLeadCountry(l.country);
+    if (!country) continue;
+    const channel = classifyLeadChannel(l.source);
+    rowsByKey.get(country)![channel].inboundLeads += 1;
+  }
+
+  const rows = COUNTRY_ORDER.map((k) => rowsByKey.get(k)!);
+  return { rows, unclassified: Array.from(unclassified) };
 }
 
 function inRange(d: Date | null, range: DateRange): boolean {

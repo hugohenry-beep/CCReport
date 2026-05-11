@@ -24,6 +24,7 @@ export function parseGoogleAdsCampaigns(buf: Buffer): GoogleAdsResult {
     if (/^-+$/.test(campaign)) continue;
     campaigns.push({
       campaign,
+      campaignType: getString(row, "Campaign type", "Campaign Type") ?? "",
       cost: getNumber(row, "Cost", "Avg. cost") ?? 0,
       conversions: getNumber(row, "Conversions", "Conv. (Platform Comparable)") ?? 0,
       conversionValue: getNumber(row, "Conv. value", "Original conv. value") ?? 0,

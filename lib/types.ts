@@ -54,6 +54,7 @@ export interface Deal {
 
 export interface Campaign {
   campaign: string;
+  campaignType: string;
   cost: number;
   conversions: number;
   conversionValue: number;
@@ -99,6 +100,37 @@ export interface HighValueDeal {
   createDate: string | null;
 }
 
+export type ChannelKey = "paidSearch" | "display";
+
+export const COUNTRY_KEYS = [
+  "USA",
+  "UK",
+  "Canada",
+  "France",
+  "DACH",
+  "Spain",
+  "Nordics",
+  "Netherlands",
+  "Italy",
+  "LATAM",
+  "Australia",
+] as const;
+export type CountryKey = (typeof COUNTRY_KEYS)[number];
+
+export interface ChannelMetrics {
+  spend: number;
+  clicks: number;
+  impressions: number;
+  paidConversions: number;
+  inboundLeads: number;
+}
+
+export interface CountryChannelRow {
+  country: CountryKey;
+  paidSearch: ChannelMetrics;
+  display: ChannelMetrics;
+}
+
 export interface PeriodMetrics {
   inboundLeadCount: number;
   bySource: SourceBreakdown[];
@@ -113,6 +145,8 @@ export interface PeriodMetrics {
   negotiatingCount: number;
   enteredContractLiveCount: number;
   enteredContractLiveDeals: HighValueDeal[];
+  paidMediaByCountry?: CountryChannelRow[];
+  unclassifiedCampaigns?: string[];
 }
 
 export interface ComparisonInfo {
