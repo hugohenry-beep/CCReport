@@ -219,11 +219,40 @@ function breakdownByCountry(leads: Lead[]): CountryBreakdown[] {
     .sort((a, b) => b.count - a.count);
 }
 
+const STAGE_AGGREGATIONS: { label: string; matches: string[] }[] = [
+  {
+    label: "New / Attempting",
+    matches: ["New (CC - Inbound & lead gen)", "New / Attempting (CC - New leads)"],
+  },
+  {
+    label: "Disqualified",
+    matches: ["Disqualified (CC - Inbound & lead gen)", "Disqualified (CC - New leads)"],
+  },
+  {
+    label: "Not pursuing",
+    matches: ["Not pursuing (CC - Inbound & lead gen)", "Not pursuing (CC - New leads)"],
+  },
+  {
+    label: "Qualified",
+    matches: ["Qualified (CC - Inbound & lead gen)", "Qualified (CC - New leads)"],
+  },
+];
+
+function normaliseStage(s: string): string {
+  return s.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+const STAGE_AGGREGATION_LOOKUP = new Map<string, string>(
+  STAGE_AGGREGATIONS.flatMap((g) => g.matches.map((m) => [normaliseStage(m), g.label] as const)),
+);
+
 function breakdownByLeadStage(leads: Lead[]): StageBreakdown[] {
   const counts = new Map<string, number>();
   for (const l of leads) {
     if (!l.leadStage) continue;
-    counts.set(l.leadStage, (counts.get(l.leadStage) ?? 0) + 1);
+    const aggregated = STAGE_AGGREGATION_LOOKUP.get(normaliseStage(l.leadStage));
+    const key = aggregated ?? l.leadStage;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   const total = leads.length || 1;
   return Array.from(counts.entries())
