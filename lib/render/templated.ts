@@ -34,51 +34,40 @@ export function renderTemplatedMarkdown(m: Metrics): string {
   // 2. Source breakdown
   lines.push(`## Inbound leads by source`);
   lines.push(``);
-  if (c.bySource.length === 0) {
-    lines.push(`_No source data available._`);
-  } else {
-    lines.push(`| Source | Count | % of total |`);
-    lines.push(`| --- | ---: | ---: |`);
-    for (const row of c.bySource) {
-      lines.push(`| ${row.source} | ${fmtNumber(row.count)} | ${fmtPct(row.pct)} |`);
-    }
-  }
+  appendBreakdownTable(lines, {
+    keyLabel: "Source",
+    emptyMessage: "_No source data available._",
+    currentRows: c.bySource,
+    priorRows: p?.bySource,
+    hasPrior: p != null,
+    keyOf: (r) => r.source,
+  });
   lines.push(``);
 
   // 3. Pipeline stage breakdown
   lines.push(`## Inbound leads by pipeline stage`);
   lines.push(``);
-  if (c.byStage.length === 0) {
-    lines.push(`_No deal-stage data available for this period._`);
-  } else {
-    lines.push(`| Stage | Count | % of total |`);
-    lines.push(`| --- | ---: | ---: |`);
-    for (const row of c.byStage) {
-      lines.push(`| ${row.stage} | ${fmtNumber(row.count)} | ${fmtPct(row.pct)} |`);
-    }
-  }
+  appendBreakdownTable(lines, {
+    keyLabel: "Stage",
+    emptyMessage: "_No deal-stage data available for this period._",
+    currentRows: c.byStage,
+    priorRows: p?.byStage,
+    hasPrior: p != null,
+    keyOf: (r) => r.stage,
+  });
   lines.push(``);
 
   // 3b. Country breakdown
   lines.push(`## Inbound leads by country`);
   lines.push(``);
-  const currentByCountry = c.byCountry ?? [];
-  const priorByCountry = p?.byCountry ?? [];
-  if (currentByCountry.length === 0) {
-    lines.push(`_No country data available._`);
-  } else {
-    const priorCounts = new Map(priorByCountry.map((r) => [r.country, r.count]));
-    lines.push(`| Country | Count | % of total | Prior | Δ vs prior |`);
-    lines.push(`| --- | ---: | ---: | ---: | --- |`);
-    for (const row of currentByCountry) {
-      const prior = priorCounts.get(row.country) ?? 0;
-      lines.push(
-        `| ${row.country} | ${fmtNumber(row.count)} | ${fmtPct(row.pct)} | ${
-          p ? fmtNumber(prior) : "—"
-        } | ${countryDelta(row.count, prior, p != null)} |`,
-      );
-    }
-  }
+  appendBreakdownTable(lines, {
+    keyLabel: "Country",
+    emptyMessage: "_No country data available._",
+    currentRows: c.byCountry ?? [],
+    priorRows: p?.byCountry,
+    hasPrior: p != null,
+    keyOf: (r) => r.country,
+  });
   lines.push(``);
 
   // 4. Spend vs results
@@ -157,23 +146,55 @@ function comparisonSourceLabel(m: Metrics): string {
 }
 
 function periodSummaryParagraph(c: PeriodMetrics, p: PeriodMetrics): string {
-  const leadDelta = pctChange(c.inboundLeadCount, p.inboundLeadCount);
-  const spendDelta = pctChange(c.adSpend, p.adSpend);
-  const cplDelta = pctChange(c.costPerLead ?? 0, p.costPerLead ?? 0);
-  const direction = (n: number) => (n > 0 ? "up" : n < 0 ? "down" : "flat");
-  return `Inbound lead volume is **${direction(leadDelta)} ${Math.abs(leadDelta).toFixed(1)}%** vs the prior period (${fmtNumber(c.inboundLeadCount)} vs ${fmtNumber(p.inboundLeadCount)}). Google Ads spend is **${direction(spendDelta)} ${Math.abs(spendDelta).toFixed(1)}%** (${fmtMoney(c.adSpend)} vs ${fmtMoney(p.adSpend)}), and cost-per-lead is **${direction(cplDelta)} ${Math.abs(cplDelta).toFixed(1)}%**.`;
+  const leads = describePctChange(c.inboundLeadCount, p.inboundLeadCount, fmtNumber);
+  const spend = describePctChange(c.adSpend, p.adSpend, fmtMoney);
+  const cpl = describePctChange(c.costPerLead ?? 0, p.costPerLead ?? 0, fmtMoney);
+  return `Inbound lead volume is **${leads}**. Google Ads spend is **${spend}**, and cost-per-lead is **${cpl}**.`;
 }
 
-function pctChange(curr: number, prior: number): number {
-  if (!prior) return 0;
-  return ((curr - prior) / prior) * 100;
+function describePctChange(curr: number, prior: number, fmt: (n: number) => string): string {
+  if (prior === 0 && curr === 0) return `held at ${fmt(0)}`;
+  if (prior === 0) return `started from 0 (now ${fmt(curr)})`;
+  const change = ((curr - prior) / prior) * 100;
+  const direction = change > 0 ? "up" : change < 0 ? "down" : "flat";
+  return `${direction} ${Math.abs(change).toFixed(1)}% vs the prior period (${fmt(curr)} vs ${fmt(prior)})`;
 }
 
-function countryDelta(curr: number, prior: number, hasPrior: boolean): string {
-  if (!hasPrior) return "—";
+function breakdownDelta(curr: number, prior: number, hasComparablePrior: boolean): string {
+  if (!hasComparablePrior) return "—";
   if (prior === 0) return curr > 0 ? "(new)" : "→ 0";
   const change = ((curr - prior) / prior) * 100;
   const arrow = change > 0 ? "▲" : change < 0 ? "▼" : "→";
   const sign = change > 0 ? "+" : "";
   return `${arrow} ${sign}${change.toFixed(1)}%`;
+}
+
+function appendBreakdownTable<T extends { count: number; pct: number }>(
+  lines: string[],
+  opts: {
+    keyLabel: string;
+    emptyMessage: string;
+    currentRows: T[];
+    priorRows: T[] | undefined;
+    hasPrior: boolean;
+    keyOf: (row: T) => string;
+  },
+): void {
+  if (opts.currentRows.length === 0) {
+    lines.push(opts.emptyMessage);
+    return;
+  }
+  const hasComparablePrior = opts.hasPrior && opts.priorRows != null;
+  const priorCounts = new Map((opts.priorRows ?? []).map((r) => [opts.keyOf(r), r.count]));
+  lines.push(`| ${opts.keyLabel} | Count | % of total | Prior | Δ vs prior |`);
+  lines.push(`| --- | ---: | ---: | ---: | --- |`);
+  for (const row of opts.currentRows) {
+    const key = opts.keyOf(row);
+    const prior = priorCounts.get(key) ?? 0;
+    lines.push(
+      `| ${key} | ${fmtNumber(row.count)} | ${fmtPct(row.pct)} | ${
+        hasComparablePrior ? fmtNumber(prior) : "—"
+      } | ${breakdownDelta(row.count, prior, hasComparablePrior)} |`,
+    );
+  }
 }

@@ -35,7 +35,8 @@ export function fmtDate(iso: string | null): string {
 }
 
 export function delta(curr: number, prior: number | null | undefined): string {
-  if (prior == null || prior === 0) return curr > 0 ? "(no prior baseline)" : "(no prior baseline)";
+  if (prior == null) return "(no prior data)";
+  if (prior === 0) return curr > 0 ? "(new — prior was 0)" : "→ no change (0)";
   const change = ((curr - prior) / prior) * 100;
   const arrow = change > 0 ? "▲" : change < 0 ? "▼" : "→";
   const sign = change > 0 ? "+" : "";
@@ -43,7 +44,8 @@ export function delta(curr: number, prior: number | null | undefined): string {
 }
 
 export function deltaMoney(curr: number, prior: number | null | undefined): string {
-  if (prior == null || prior === 0) return "(no prior baseline)";
+  if (prior == null) return "(no prior data)";
+  if (prior === 0) return curr > 0 ? "(new — prior was $0)" : "→ no change ($0)";
   const change = ((curr - prior) / prior) * 100;
   const arrow = change > 0 ? "▲" : change < 0 ? "▼" : "→";
   const sign = change > 0 ? "+" : "";

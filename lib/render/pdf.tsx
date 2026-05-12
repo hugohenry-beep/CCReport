@@ -17,6 +17,54 @@ const styles = StyleSheet.create({
   small: { fontSize: 9, color: "#5a6370" },
 });
 
+function BreakdownTable<T extends { count: number; pct: number }>(props: {
+  keyLabel: string;
+  emptyMessage: string;
+  currentRows: T[];
+  priorRows: T[] | undefined;
+  hasPrior: boolean;
+  keyOf: (row: T) => string;
+}) {
+  if (props.currentRows.length === 0) {
+    return <Text style={styles.p}>{props.emptyMessage}</Text>;
+  }
+  const hasComparablePrior = props.hasPrior && props.priorRows != null;
+  const priorMap = new Map((props.priorRows ?? []).map((r) => [props.keyOf(r), r.count]));
+  return (
+    <View style={styles.table}>
+      <View style={styles.row}>
+        <Text style={styles.th}>{props.keyLabel}</Text>
+        <Text style={styles.th}>Count</Text>
+        <Text style={styles.th}>% total</Text>
+        <Text style={styles.th}>Prior</Text>
+        <Text style={styles.th}>Δ vs prior</Text>
+      </View>
+      {props.currentRows.map((r, i) => {
+        const key = props.keyOf(r);
+        const prior = priorMap.get(key) ?? 0;
+        let deltaLabel: string;
+        if (!hasComparablePrior) deltaLabel = "—";
+        else if (prior === 0) deltaLabel = r.count > 0 ? "(new)" : "→ 0";
+        else {
+          const change = ((r.count - prior) / prior) * 100;
+          const arrow = change > 0 ? "▲" : change < 0 ? "▼" : "→";
+          const sign = change > 0 ? "+" : "";
+          deltaLabel = `${arrow} ${sign}${change.toFixed(1)}%`;
+        }
+        return (
+          <View style={styles.row} key={i}>
+            <Text style={styles.td}>{key}</Text>
+            <Text style={styles.td}>{fmtNumber(r.count)}</Text>
+            <Text style={styles.td}>{fmtPct(r.pct)}</Text>
+            <Text style={styles.td}>{hasComparablePrior ? fmtNumber(prior) : "—"}</Text>
+            <Text style={styles.td}>{deltaLabel}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 function ReportPdf({ metrics }: { metrics: Metrics }) {
   const c = metrics.current;
   const p = metrics.prior;
@@ -47,85 +95,34 @@ function ReportPdf({ metrics }: { metrics: Metrics }) {
         <Text style={styles.bullet}>• Cost per inbound lead: {c.costPerLead != null ? fmtMoney(c.costPerLead) : "—"} {p?.costPerLead != null ? `(prior: ${fmtMoney(p.costPerLead)})` : ""}</Text>
 
         <Text style={styles.h2}>Inbound leads by source</Text>
-        {c.bySource.length === 0 ? (
-          <Text style={styles.p}>No source data available.</Text>
-        ) : (
-          <View style={styles.table}>
-            <View style={styles.row}>
-              <Text style={styles.th}>Source</Text>
-              <Text style={styles.th}>Count</Text>
-              <Text style={styles.th}>% total</Text>
-            </View>
-            {c.bySource.map((r, i) => (
-              <View style={styles.row} key={i}>
-                <Text style={styles.td}>{r.source}</Text>
-                <Text style={styles.td}>{fmtNumber(r.count)}</Text>
-                <Text style={styles.td}>{fmtPct(r.pct)}</Text>
-              </View>
-            ))}
-          </View>
-        )}
+        <BreakdownTable
+          keyLabel="Source"
+          emptyMessage="No source data available."
+          currentRows={c.bySource}
+          priorRows={p?.bySource}
+          hasPrior={p != null}
+          keyOf={(r) => r.source}
+        />
 
         <Text style={styles.h2}>Inbound leads by pipeline stage</Text>
-        {c.byStage.length === 0 ? (
-          <Text style={styles.p}>No deal-stage data available for this period.</Text>
-        ) : (
-          <View style={styles.table}>
-            <View style={styles.row}>
-              <Text style={styles.th}>Stage</Text>
-              <Text style={styles.th}>Count</Text>
-              <Text style={styles.th}>% total</Text>
-            </View>
-            {c.byStage.map((r, i) => (
-              <View style={styles.row} key={i}>
-                <Text style={styles.td}>{r.stage}</Text>
-                <Text style={styles.td}>{fmtNumber(r.count)}</Text>
-                <Text style={styles.td}>{fmtPct(r.pct)}</Text>
-              </View>
-            ))}
-          </View>
-        )}
+        <BreakdownTable
+          keyLabel="Stage"
+          emptyMessage="No deal-stage data available for this period."
+          currentRows={c.byStage}
+          priorRows={p?.byStage}
+          hasPrior={p != null}
+          keyOf={(r) => r.stage}
+        />
 
         <Text style={styles.h2}>Inbound leads by country</Text>
-        {(() => {
-          const cur = c.byCountry ?? [];
-          if (cur.length === 0) {
-            return <Text style={styles.p}>No country data available.</Text>;
-          }
-          const priorMap = new Map((p?.byCountry ?? []).map((r) => [r.country, r.count]));
-          return (
-            <View style={styles.table}>
-              <View style={styles.row}>
-                <Text style={styles.th}>Country</Text>
-                <Text style={styles.th}>Count</Text>
-                <Text style={styles.th}>% total</Text>
-                <Text style={styles.th}>Prior</Text>
-                <Text style={styles.th}>Δ vs prior</Text>
-              </View>
-              {cur.map((r, i) => {
-                const prior = priorMap.get(r.country) ?? 0;
-                let deltaLabel: string;
-                if (!p) deltaLabel = "—";
-                else if (prior === 0) deltaLabel = r.count > 0 ? "(new)" : "→ 0";
-                else {
-                  const change = ((r.count - prior) / prior) * 100;
-                  const arrow = change > 0 ? "▲" : change < 0 ? "▼" : "→";
-                  const sign = change > 0 ? "+" : "";
-                  deltaLabel = `${arrow} ${sign}${change.toFixed(1)}%`;
-                }
-                return (
-                  <View style={styles.row} key={i}>
-                    <Text style={styles.td}>{r.country}</Text>
-                    <Text style={styles.td}>{fmtNumber(r.count)}</Text>
-                    <Text style={styles.td}>{fmtPct(r.pct)}</Text>
-                    <Text style={styles.td}>{p ? fmtNumber(prior) : "—"}</Text>
-                    <Text style={styles.td}>{deltaLabel}</Text>
-                  </View>
-                );
-              })}
-            </View>
-          );
-        })()}
+        <BreakdownTable
+          keyLabel="Country"
+          emptyMessage="No country data available."
+          currentRows={c.byCountry ?? []}
+          priorRows={p?.byCountry}
+          hasPrior={p != null}
+          keyOf={(r) => r.country}
+        />
 
         <Text style={styles.h2}>Budget spend vs results</Text>
         <View style={styles.table}>
