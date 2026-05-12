@@ -219,38 +219,70 @@ function breakdownByCountry(leads: Lead[]): CountryBreakdown[] {
     .sort((a, b) => b.count - a.count);
 }
 
-const STAGE_AGGREGATIONS: { label: string; matches: string[] }[] = [
+const STAGE_AGGREGATIONS: { label: string; pairs: { name: string; pipeline: string }[] }[] = [
   {
     label: "New / Attempting",
-    matches: ["New (CC - Inbound & lead gen)", "New / Attempting (CC - New leads)"],
+    pairs: [
+      { name: "new", pipeline: "cc - inbound & lead gen" },
+      { name: "new / attempting", pipeline: "cc - new leads" },
+    ],
   },
   {
     label: "Disqualified",
-    matches: ["Disqualified (CC - Inbound & lead gen)", "Disqualified (CC - New leads)"],
+    pairs: [
+      { name: "disqualified", pipeline: "cc - inbound & lead gen" },
+      { name: "disqualified", pipeline: "cc - new leads" },
+    ],
   },
   {
     label: "Not pursuing",
-    matches: ["Not pursuing (CC - Inbound & lead gen)", "Not pursuing (CC - New leads)"],
+    pairs: [
+      { name: "not pursuing", pipeline: "cc - inbound & lead gen" },
+      { name: "not pursuing", pipeline: "cc - new leads" },
+    ],
   },
   {
     label: "Qualified",
-    matches: ["Qualified (CC - Inbound & lead gen)", "Qualified (CC - New leads)"],
+    pairs: [
+      { name: "qualified", pipeline: "cc - inbound & lead gen" },
+      { name: "qualified", pipeline: "cc - new leads" },
+    ],
   },
 ];
 
-function normaliseStage(s: string): string {
-  return s.replace(/\s+/g, " ").trim().toLowerCase();
+function normaliseStagePart(s: string): string {
+  return s
+    .replace(/[‐-―−]/g, "-") // any unicode dash → ASCII hyphen
+    .replace(/[   ]/g, " ") // non-breaking spaces → regular space
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
-const STAGE_AGGREGATION_LOOKUP = new Map<string, string>(
-  STAGE_AGGREGATIONS.flatMap((g) => g.matches.map((m) => [normaliseStage(m), g.label] as const)),
-);
+function parseStageString(raw: string): { name: string; pipeline: string | null } {
+  const m = raw.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
+  if (!m) return { name: normaliseStagePart(raw), pipeline: null };
+  return { name: normaliseStagePart(m[1]), pipeline: normaliseStagePart(m[2]) };
+}
+
+function aggregatedStageLabel(rawStage: string): string | null {
+  const parsed = parseStageString(rawStage);
+  if (!parsed.pipeline) return null;
+  for (const group of STAGE_AGGREGATIONS) {
+    for (const pair of group.pairs) {
+      if (parsed.name === pair.name && parsed.pipeline === pair.pipeline) {
+        return group.label;
+      }
+    }
+  }
+  return null;
+}
 
 function breakdownByLeadStage(leads: Lead[]): StageBreakdown[] {
   const counts = new Map<string, number>();
   for (const l of leads) {
     if (!l.leadStage) continue;
-    const aggregated = STAGE_AGGREGATION_LOOKUP.get(normaliseStage(l.leadStage));
+    const aggregated = aggregatedStageLabel(l.leadStage);
     const key = aggregated ?? l.leadStage;
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
