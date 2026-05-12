@@ -26,6 +26,7 @@ export default function ReportClient({ reportId, initialHtml, initialMarkdown, i
   const [narrativeMode, setNarrativeMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
 
   async function saveName() {
     setError(null);
@@ -92,8 +93,18 @@ export default function ReportClient({ reportId, initialHtml, initialMarkdown, i
     }
   }
 
-  function copyMarkdown() {
-    navigator.clipboard.writeText(markdown);
+  async function copyMarkdown() {
+    setError(null);
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard API is unavailable (try over HTTPS or a modern browser).");
+      }
+      await navigator.clipboard.writeText(markdown);
+      setCopyStatus("copied");
+      setTimeout(() => setCopyStatus("idle"), 1500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
   }
 
   return (
@@ -189,7 +200,7 @@ export default function ReportClient({ reportId, initialHtml, initialMarkdown, i
           onClick={copyMarkdown}
           className="px-3 py-1.5 rounded bg-[var(--panel-2)] border border-[var(--border)] text-sm hover:bg-[var(--panel)]"
         >
-          Copy Markdown
+          {copyStatus === "copied" ? "Copied!" : "Copy Markdown"}
         </button>
         <button
           onClick={rewrite}
@@ -206,6 +217,26 @@ export default function ReportClient({ reportId, initialHtml, initialMarkdown, i
         className="report-prose bg-[var(--panel)] border border-[var(--border)] rounded-lg p-6"
         dangerouslySetInnerHTML={{ __html: html }}
       />
+
+      <details className="bg-[var(--panel)] border border-[var(--border)] rounded-lg group">
+        <summary className="cursor-pointer select-none px-4 py-2 text-sm font-medium flex items-center justify-between">
+          <span>View raw markdown</span>
+          <span className="text-xs text-[var(--text-muted)] group-open:hidden">click to expand</span>
+        </summary>
+        <div className="px-4 pb-4 space-y-2">
+          <div className="flex justify-end">
+            <button
+              onClick={copyMarkdown}
+              className="px-2 py-1 rounded bg-[var(--panel-2)] border border-[var(--border)] text-xs hover:bg-[var(--panel)]"
+            >
+              {copyStatus === "copied" ? "Copied!" : "Copy"}
+            </button>
+          </div>
+          <pre className="text-xs overflow-x-auto whitespace-pre-wrap bg-[var(--panel-2)] border border-[var(--border)] rounded p-3 max-h-[480px]">
+            {markdown}
+          </pre>
+        </div>
+      </details>
     </div>
   );
 }
