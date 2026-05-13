@@ -2,44 +2,345 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --bg: #0b0d10;
-  --panel: #14171c;
-  --panel-2: #1b1f26;
-  --border: #2a2f38;
-  --text: #e6e9ef;
-  --text-muted: #9aa3b2;
-  --accent: #6366f1;
-  --accent-hover: #4f46e5;
-  --success: #10b981;
-  --warning: #f59e0b;
-  --danger: #ef4444;
+@layer base {
+  :root,
+  [data-theme="dark"] {
+    --bg: #0a0c10;
+    --surface: #12151c;
+    --surface-2: #181c25;
+    --surface-3: #1f2430;
+    --border: #262c39;
+    --border-strong: #343b4a;
+    --text: #e8ebf2;
+    --text-muted: #97a0b3;
+    --text-subtle: #6a7388;
+    --accent: #7c83ff;
+    --accent-hover: #8d93ff;
+    --accent-fg: #ffffff;
+    --accent-soft: rgba(124, 131, 255, 0.16);
+    --success: #34d399;
+    --success-soft: rgba(52, 211, 153, 0.14);
+    --warning: #fbbf24;
+    --warning-soft: rgba(251, 191, 36, 0.14);
+    --danger: #f87171;
+    --danger-soft: rgba(248, 113, 113, 0.14);
+    --chart-1: #7c83ff;
+    --chart-2: #34d399;
+    --chart-3: #fbbf24;
+    --chart-4: #f87171;
+    --chart-5: #38bdf8;
+    --chart-6: #c084fc;
+    --radius-lg: 14px;
+    --radius-md: 8px;
+    --radius-sm: 6px;
+    color-scheme: dark;
+  }
+
+  [data-theme="light"] {
+    --bg: #f7f8fb;
+    --surface: #ffffff;
+    --surface-2: #f1f3f8;
+    --surface-3: #e7eaf2;
+    --border: #e2e6ee;
+    --border-strong: #cdd3df;
+    --text: #11141a;
+    --text-muted: #4f586b;
+    --text-subtle: #7b8497;
+    --accent: #4f46e5;
+    --accent-hover: #4338ca;
+    --accent-fg: #ffffff;
+    --accent-soft: rgba(79, 70, 229, 0.10);
+    --success: #059669;
+    --success-soft: rgba(5, 150, 105, 0.12);
+    --warning: #b45309;
+    --warning-soft: rgba(180, 83, 9, 0.12);
+    --danger: #b91c1c;
+    --danger-soft: rgba(185, 28, 28, 0.10);
+    --chart-1: #4f46e5;
+    --chart-2: #059669;
+    --chart-3: #d97706;
+    --chart-4: #dc2626;
+    --chart-5: #0284c7;
+    --chart-6: #9333ea;
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+    border-radius: var(--radius-sm);
+  }
+
+  /* Tabular numbers for any element marked .tabular */
+  .tabular,
+  table td,
+  table th {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--text);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
-html, body {
-  background: var(--bg);
+@layer components {
+  .skip-link {
+    position: absolute;
+    left: 0.75rem;
+    top: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-radius: var(--radius-sm);
+    transform: translateY(-200%);
+    transition: transform 150ms ease-out;
+    z-index: 100;
+  }
+  .skip-link:focus {
+    transform: translateY(0);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* ===========================
+   .report-prose — used inside the rendered HTML report body.
+   Aims for "polished long-form report" feel, with strong tables.
+   =========================== */
+.report-prose {
   color: var(--text);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  font-size: 0.95rem;
+  line-height: 1.65;
 }
 
-.report-prose h1 { font-size: 1.875rem; font-weight: 700; margin: 1.25rem 0 0.75rem; }
-.report-prose h2 { font-size: 1.5rem; font-weight: 700; margin: 1.5rem 0 0.5rem; }
-.report-prose h3 { font-size: 1.125rem; font-weight: 600; margin: 1rem 0 0.5rem; color: var(--text); }
-.report-prose p  { margin: 0.5rem 0; line-height: 1.6; color: var(--text); }
-.report-prose ul { margin: 0.5rem 0 0.5rem 1.25rem; list-style: disc; }
-.report-prose li { margin: 0.2rem 0; }
-.report-prose strong { color: #fff; }
+.report-prose h1 {
+  font-family: var(--font-display);
+  font-size: 1.875rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin: 1.5rem 0 1rem;
+  color: var(--text);
+}
+.report-prose h2 {
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 2.25rem 0 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  scroll-margin-top: 5rem;
+}
+.report-prose h3 {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.5rem;
+  color: var(--text);
+}
+.report-prose p {
+  margin: 0.65rem 0;
+  color: var(--text);
+}
+.report-prose ul {
+  margin: 0.5rem 0 0.75rem 0;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+.report-prose ul ul {
+  list-style: circle;
+  margin: 0.25rem 0;
+}
+.report-prose li {
+  margin: 0.2rem 0;
+}
+.report-prose li::marker {
+  color: var(--text-subtle);
+}
+.report-prose strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .report-prose table {
   width: 100%;
-  border-collapse: collapse;
-  margin: 0.75rem 0 1rem;
-  font-size: 0.9rem;
-}
-.report-prose th, .report-prose td {
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 0.85rem 0 1.25rem;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
   border: 1px solid var(--border);
-  padding: 0.45rem 0.6rem;
-  text-align: left;
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
-.report-prose th { background: var(--panel-2); font-weight: 600; }
-.report-prose code { background: var(--panel-2); padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.85em; }
-.report-prose blockquote { border-left: 3px solid var(--accent); padding-left: 0.75rem; color: var(--text-muted); margin: 0.5rem 0; }
+.report-prose th,
+.report-prose td {
+  padding: 0.6rem 0.85rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.report-prose th {
+  background: var(--surface-2);
+  font-weight: 600;
+  color: var(--text);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.report-prose tbody tr:last-child td {
+  border-bottom: none;
+}
+.report-prose tbody tr:nth-child(even) td {
+  background: var(--surface-2);
+}
+.report-prose tbody tr:hover td {
+  background: var(--accent-soft);
+}
+.report-prose th:not(:first-child),
+.report-prose td:not(:first-child) {
+  text-align: right;
+}
+
+.report-prose code {
+  background: var(--surface-2);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-family: var(--font-mono);
+  border: 1px solid var(--border);
+}
+.report-prose blockquote {
+  border-left: 3px solid var(--accent);
+  padding: 0.25rem 0 0.25rem 0.85rem;
+  color: var(--text-muted);
+  margin: 0.75rem 0;
+  background: var(--accent-soft);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.report-prose hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.5rem 0;
+}
+.report-prose a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: var(--accent-soft);
+  text-underline-offset: 3px;
+}
+.report-prose a:hover {
+  text-decoration-color: var(--accent);
+}
+
+/* Colored delta cells — applied via post-processing of the report HTML. */
+.report-prose td.delta-up,
+.report-prose span.delta-up {
+  color: var(--success);
+  font-weight: 600;
+}
+.report-prose td.delta-down,
+.report-prose span.delta-down {
+  color: var(--danger);
+  font-weight: 600;
+}
+.report-prose td.delta-flat,
+.report-prose span.delta-flat {
+  color: var(--text-muted);
+}
+
+/* Written-mode prose — slightly larger / more readable, no table styling needed. */
+.written-prose {
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.7;
+  max-width: 70ch;
+}
+.written-prose h1 {
+  font-family: var(--font-display);
+  font-size: 1.875rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin: 1rem 0 1rem;
+}
+.written-prose h2 {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 2rem 0 0.5rem;
+  color: var(--text);
+}
+.written-prose h3 {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.5rem;
+}
+.written-prose p {
+  margin: 0.75rem 0;
+}
+.written-prose ul {
+  margin: 0.5rem 0 1rem 0;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+.written-prose li {
+  margin: 0.35rem 0;
+}
+.written-prose strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Print rules — useful when users hit Cmd-P on the report page. */
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .report-prose {
+    color: #000;
+  }
+  .report-prose th {
+    background: #f3f4f6;
+    color: #000;
+  }
+  .report-prose tbody tr:nth-child(even) td {
+    background: #fafafa;
+  }
+}

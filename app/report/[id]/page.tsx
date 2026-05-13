@@ -8,6 +8,13 @@ import ReportClient from "./ReportClient";
 
 export const dynamic = "force-dynamic";
 
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const snap = await getSnapshot(id);
+  if (!snap) return { title: "Report not found" };
+  return { title: snap.name ?? "Untitled report" };
+}
+
 export default async function ReportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const snap = await getSnapshot(id);
@@ -18,10 +25,10 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
 
   const cmpLabel =
     metrics.comparisonInfo.source === "current_upload"
-      ? "Comparison: derived from this upload"
+      ? "Comparison derived from this upload"
       : metrics.comparisonInfo.source === "stored_snapshot"
       ? `Comparison: stored snapshot (${fmtDateRange(metrics.comparisonInfo.snapshotPeriodStart!, metrics.comparisonInfo.snapshotPeriodEnd!)})`
-      : "Comparison: no prior data";
+      : "No prior data available for comparison";
 
   return (
     <ReportClient
@@ -29,11 +36,13 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       initialHtml={html}
       initialMarkdown={md}
       initialName={snap.name}
+      metrics={metrics}
       meta={{
         period: fmtDateRange(metrics.periodStart, metrics.periodEnd),
         priorPeriod: fmtDateRange(metrics.priorPeriodStart, metrics.priorPeriodEnd),
         adsPeriodLabel: metrics.adsPeriodLabel,
         cmpLabel,
+        warnings: metrics.warnings ?? [],
       }}
     />
   );
