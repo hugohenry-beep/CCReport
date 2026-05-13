@@ -84,6 +84,12 @@ export interface TopHighValueDeal {
   stage: string;
 }
 
+export interface AnalyticalBlocks {
+  summary: string;
+  efficiencyTake: string;
+  outlook: string;
+}
+
 export interface ExecutiveFacts {
   period: { current: string; prior: string; adsLabel: string | null };
   comparisonNote: string;
@@ -92,6 +98,7 @@ export interface ExecutiveFacts {
 
   headline: HeadlineSignal;
   tldr: string[];
+  analysis: AnalyticalBlocks;
 
   scorecard: ScorecardRow[];
 
@@ -191,6 +198,24 @@ export function deriveExecutiveFacts(m: Metrics): ExecutiveFacts {
     hasPrior,
   });
 
+  const analysis = buildAnalyticalBlocks({
+    hasPrior,
+    headline,
+    leads: leadsDelta,
+    spend: spendDelta,
+    pipeline: pipelineDelta,
+    cpl: cplDelta,
+    spp: sppDelta,
+    pps: efficiency.pipelinePerSpendDollar,
+    demo: demoDelta,
+    negotiating: negDelta,
+    contract: contractDelta,
+    contractLiveCount: c.enteredContractLiveCount,
+    anomalies,
+    highValueCount: sortedHighValue.length,
+    highValueTotalFormatted: fmtMoney(highValueTotal),
+  });
+
   return {
     period,
     comparisonNote,
@@ -198,6 +223,7 @@ export function deriveExecutiveFacts(m: Metrics): ExecutiveFacts {
     isFirstReport: !hasPrior,
     headline,
     tldr,
+    analysis,
     scorecard,
     topMovers: movers.topMovers,
     newEntries: movers.newEntries,
@@ -692,4 +718,180 @@ function buildTldr(opts: {
   }
 
   return bullets.slice(0, 5);
+}
+
+function buildAnalyticalBlocks(opts: {
+  hasPrior: boolean;
+  headline: HeadlineSignal;
+  leads: DeltaPct;
+  spend: DeltaPct;
+  pipeline: DeltaPct;
+  cpl: DeltaPct;
+  spp: DeltaPct;
+  pps: DeltaPct;
+  demo: DeltaPct;
+  negotiating: DeltaPct;
+  contract: DeltaPct;
+  contractLiveCount: number;
+  anomalies: Anomaly[];
+  highValueCount: number;
+  highValueTotalFormatted: string;
+}): AnalyticalBlocks {
+  const summary = buildSummaryParagraph(opts);
+  const efficiencyTake = buildEfficiencyTake(opts);
+  const outlook = buildOutlookParagraph(opts);
+  return { summary, efficiencyTake, outlook };
+}
+
+function buildSummaryParagraph(opts: {
+  hasPrior: boolean;
+  headline: HeadlineSignal;
+  leads: DeltaPct;
+  spend: DeltaPct;
+  pipeline: DeltaPct;
+  cpl: DeltaPct;
+  contract: DeltaPct;
+  contractLiveCount: number;
+  highValueCount: number;
+  highValueTotalFormatted: string;
+}): string {
+  const { hasPrior, headline, leads, spend, pipeline, cpl, contractLiveCount, highValueCount, highValueTotalFormatted } = opts;
+
+  if (!hasPrior) {
+    return (
+      `First report in the stack. Baseline this week: ${leads.formattedCurr} inbound leads on ${spend.formattedCurr} of ad spend, producing ${pipeline.formattedCurr} of new pipeline at ${cpl.formattedCurr} per lead. ` +
+      `${highValueCount > 0 ? `${highValueCount} high-value deal${highValueCount === 1 ? "" : "s"} (${highValueTotalFormatted} total) anchor the period. ` : ""}` +
+      `These figures become the comparison window for next week's read.`
+    );
+  }
+
+  const fragments: string[] = [];
+
+  switch (headline.kind) {
+    case "efficiencyLoss":
+      fragments.push(
+        `Volume softened while cost per lead climbed to ${cpl.formattedCurr} (${cpl.formattedDelta}), making cost efficiency the week's lead signal.`,
+      );
+      fragments.push(
+        `Pipeline created held at ${pipeline.formattedCurr} (${pipeline.formattedDelta}), which keeps the funnel intact for now — but the CPL gap vs prior bears watching.`,
+      );
+      break;
+    case "efficiencyWin":
+      fragments.push(
+        `Cost per lead dropped to ${cpl.formattedCurr} (${cpl.formattedDelta}) on ${leads.formattedDelta} volume — paid is buying more for less this week.`,
+      );
+      fragments.push(
+        `Pipeline created at ${pipeline.formattedCurr} (${pipeline.formattedDelta}) reinforces that the gain is real, not a counting artefact.`,
+      );
+      break;
+    case "volumeShift":
+      fragments.push(
+        `Inbound volume moved ${leads.formattedDelta} to ${leads.formattedCurr} — a step outside the normal week-over-week range vs prior ${leads.formattedPrior}.`,
+      );
+      fragments.push(
+        `Pipeline at ${pipeline.formattedCurr} (${pipeline.formattedDelta}) shows whether quality followed the quantity shift.`,
+      );
+      break;
+    case "spendShift":
+      fragments.push(
+        `Ad spend moved ${spend.formattedDelta} to ${spend.formattedCurr}, the dominant lever this week.`,
+      );
+      fragments.push(
+        `Downstream impact: ${leads.formattedCurr} leads (${leads.formattedDelta}) and ${pipeline.formattedCurr} pipeline (${pipeline.formattedDelta}) at ${cpl.formattedCurr} per lead.`,
+      );
+      break;
+    case "pipelineMomentum":
+      fragments.push(
+        `${contractLiveCount} deal${contractLiveCount === 1 ? "" : "s"} moved into Contract Live this week (${opts.contract.formattedDelta}), adding measurable closed pipeline.`,
+      );
+      fragments.push(
+        `Top-of-funnel held: ${leads.formattedCurr} leads (${leads.formattedDelta}) on ${spend.formattedCurr} of spend, producing ${pipeline.formattedCurr} of new pipeline.`,
+      );
+      break;
+    case "leadsAndSpend":
+      fragments.push(
+        `Both volume and spend moved meaningfully: ${leads.formattedDelta} leads on ${spend.formattedDelta} spend.`,
+      );
+      fragments.push(
+        `Net result is ${pipeline.formattedCurr} pipeline (${pipeline.formattedDelta}) at ${cpl.formattedCurr} per lead (${cpl.formattedDelta}).`,
+      );
+      break;
+    case "steady":
+      fragments.push(
+        `A steady week: ${leads.formattedCurr} leads (${leads.formattedDelta}), ${spend.formattedCurr} spend (${spend.formattedDelta}), ${pipeline.formattedCurr} pipeline (${pipeline.formattedDelta}).`,
+      );
+      fragments.push(`No metric stepped outside the normal range — the funnel is operating to plan.`);
+      break;
+    case "firstReport":
+      // handled by !hasPrior branch above
+      break;
+  }
+
+  if (highValueCount > 0) {
+    fragments.push(
+      `${highValueCount} high-value deal${highValueCount === 1 ? "" : "s"} (${highValueTotalFormatted} total) sit above the $15K threshold.`,
+    );
+  }
+
+  return fragments.join(" ");
+}
+
+function buildEfficiencyTake(opts: {
+  hasPrior: boolean;
+  cpl: DeltaPct;
+  pps: DeltaPct;
+  spp: DeltaPct;
+  spend: DeltaPct;
+  pipeline: DeltaPct;
+}): string {
+  const { hasPrior, cpl, pps, spp, spend, pipeline } = opts;
+
+  if (!hasPrior) {
+    const ppsPart = pps.curr > 0 ? `every $1 of spend returns ${pps.formattedCurr} of pipeline at ${cpl.formattedCurr} per lead` : `cost per lead is ${cpl.formattedCurr}`;
+    return `Baseline efficiency: ${ppsPart}. Track this ratio week-over-week to see whether paid is buying better or worse pipeline over time.`;
+  }
+
+  const cplUp = cpl.direction === "up";
+  const ppsUp = pps.direction === "up";
+
+  if (cplUp && ppsUp) {
+    return `Cost per lead is up (${cpl.formattedDelta}) but pipeline per spend dollar improved (${pps.formattedDelta} to ${pps.formattedCurr}) — the funnel is converting fewer, larger deals. Net efficiency is positive even as top-of-funnel cost rose.`;
+  }
+  if (!cplUp && ppsUp) {
+    return `Both gauges point the right way: CPL down (${cpl.formattedDelta}) and ${pps.formattedCurr} of pipeline per $1 of spend (${pps.formattedDelta}). This is the highest-quality read in the comparison window.`;
+  }
+  if (cplUp && !ppsUp) {
+    return `Cost per lead is rising (${cpl.formattedDelta}) and pipeline per spend dollar slipped (${pps.formattedDelta} to ${pps.formattedCurr}). Both gauges point the wrong way; review source mix before any budget increase.`;
+  }
+  return `CPL eased (${cpl.formattedDelta}) but pipeline per spend dollar held flat-to-down (${pps.formattedDelta}). Top-of-funnel cost is fine; the question is whether enough of those leads converted into pipeline.`;
+}
+
+function buildOutlookParagraph(opts: {
+  hasPrior: boolean;
+  anomalies: Anomaly[];
+  contractLiveCount: number;
+  contract: DeltaPct;
+  pipeline: DeltaPct;
+}): string {
+  const { hasPrior, anomalies, contractLiveCount, contract, pipeline } = opts;
+
+  if (!hasPrior) {
+    return `Establish two more weekly baselines before drawing trend conclusions. No reallocation indicated by this read.`;
+  }
+
+  const alert = anomalies.find((a) => a.severity === "alert");
+  if (alert) {
+    return `Next-week watch-item: ${alert.message} Recommend a deeper look at source mix and campaign-level performance before any reallocation.`;
+  }
+
+  if (contractLiveCount > 0 && contract.direction !== "down") {
+    return `Hold course. The forward signal is ${contractLiveCount} new Contract Live entr${contractLiveCount === 1 ? "y" : "ies"} (${contract.formattedDelta}) and ${pipeline.formattedCurr} of pipeline (${pipeline.formattedDelta}) — keep the current allocation through next week's read.`;
+  }
+
+  const watch = anomalies.find((a) => a.severity === "watch");
+  if (watch) {
+    return `One soft signal worth tracking: ${watch.message} No action this week; revisit if it persists into next week's read.`;
+  }
+
+  return `Hold course. No reallocation indicated; recheck next week's read for any drift.`;
 }
