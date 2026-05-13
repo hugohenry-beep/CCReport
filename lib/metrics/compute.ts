@@ -1,4 +1,5 @@
 import type {
+  AdvancedStageDeal,
   Campaign,
   ChannelMetrics,
   ComparisonInfo,
@@ -12,6 +13,9 @@ import type {
   Metrics,
   ParsedDatasets,
   PeriodMetrics,
+  RegionGroup,
+  RegionGroupBreakdown,
+  RegionStageCounts,
   SourceBreakdown,
   StageBreakdown,
 } from "../types";
@@ -24,6 +28,22 @@ import {
   classifyLeadChannel,
   classifyLeadCountry,
 } from "./paidMediaClassification";
+
+const REGION_GROUP_MAP: Record<CountryKey, RegionGroup> = {
+  USA: "USA & Canada",
+  Canada: "USA & Canada",
+  UK: "Europe & ROW",
+  France: "Europe & ROW",
+  DACH: "Europe & ROW",
+  Spain: "Europe & ROW",
+  Nordics: "Europe & ROW",
+  Netherlands: "Europe & ROW",
+  Italy: "Europe & ROW",
+  LATAM: "LATAM",
+  Australia: "Australia",
+};
+
+const ALL_REGION_GROUPS: RegionGroup[] = ["USA & Canada", "Europe & ROW", "LATAM", "Australia"];
 
 export interface ComputeOptions {
   range: DateRange;
@@ -59,6 +79,10 @@ export function compute(datasets: ParsedDatasets, opts: ComputeOptions): Metrics
     comparisonInfo = { source: "none" };
   }
 
+  if (prior) {
+    enrichRegionGroupDeltas(current, prior);
+  }
+
   return {
     current,
     prior,
@@ -70,6 +94,25 @@ export function compute(datasets: ParsedDatasets, opts: ComputeOptions): Metrics
     adsPeriodLabel: datasets.adsPeriodLabel,
     warnings: datasets.warnings,
   };
+}
+
+function enrichRegionGroupDeltas(current: PeriodMetrics, prior: PeriodMetrics): void {
+  if (!current.byRegionGroup || !prior.byRegionGroup) return;
+  const priorMap = new Map(prior.byRegionGroup.map((r) => [r.group, r.count]));
+  for (const row of current.byRegionGroup) {
+    const priorCount = priorMap.get(row.group);
+    if (priorCount == null) {
+      row.priorCount = null;
+      row.deltaPct = null;
+      continue;
+    }
+    row.priorCount = priorCount;
+    if (priorCount === 0) {
+      row.deltaPct = row.count > 0 ? null : 0;
+    } else {
+      row.deltaPct = ((row.count - priorCount) / priorCount) * 100;
+    }
+  }
 }
 
 function computeForPeriod(datasets: ParsedDatasets, range: DateRange): PeriodMetrics {
@@ -112,6 +155,14 @@ function computeForPeriod(datasets: ParsedDatasets, range: DateRange): PeriodMet
     (d) => matchStage(d.dealStage, "contract_live") && inRange(d.closeDate, range),
   );
 
+  const paidSearchTotals = buildPaidSearchTotals(leadsInRange, paidMediaByCountry);
+  const byRegionGroup = buildRegionGroupBreakdown(leadsInRange);
+  const inactiveRegionGroups = inboundLeadCount > 0
+    ? ALL_REGION_GROUPS.filter((g) => !byRegionGroup.some((r) => r.group === g && r.count > 0))
+    : [];
+  const arrCreated = buildArrCreated(datasets, range);
+  const advancedStageDeals = buildAdvancedStageDeals(datasets, range);
+
   return {
     inboundLeadCount,
     bySource,
@@ -128,6 +179,14 @@ function computeForPeriod(datasets: ParsedDatasets, range: DateRange): PeriodMet
     enteredContractLiveDeals: enteredContractLive.map(toHighValue),
     paidMediaByCountry,
     unclassifiedCampaigns,
+    paidSearchInboundLeads: paidSearchTotals.paidSearchInboundLeads,
+    paidSearchSpend: paidSearchTotals.paidSearchSpend,
+    paidSearchCostPerLead: paidSearchTotals.paidSearchCostPerLead,
+    directOrganicInboundLeads: paidSearchTotals.directOrganicInboundLeads,
+    arrCreated,
+    byRegionGroup,
+    inactiveRegionGroups,
+    advancedStageDeals,
   };
 }
 
@@ -248,6 +307,13 @@ const STAGE_AGGREGATIONS: { label: string; pairs: { name: string; pipeline: stri
       { name: "qualified", pipeline: "cc - new leads" },
     ],
   },
+  {
+    label: "Engaged",
+    pairs: [
+      { name: "engaged", pipeline: "cc - inbound & lead gen" },
+      { name: "engaged", pipeline: "cc - new leads" },
+    ],
+  },
 ];
 
 function normaliseStagePart(s: string): string {
@@ -337,4 +403,162 @@ function datasetsCoverRange(datasets: ParsedDatasets, range: DateRange): boolean
     (d) => d.createDate && d.createDate.getTime() < start,
   );
   return haveEarlierLead || haveEarlierDeal;
+}
+
+function buildPaidSearchTotals(
+  leadsInRange: Lead[],
+  paidMediaByCountry: CountryChannelRow[],
+): {
+  paidSearchInboundLeads: number;
+  paidSearchSpend: number;
+  paidSearchCostPerLead: number | null;
+  directOrganicInboundLeads: number;
+} {
+  let paidSearchInboundLeads = 0;
+  let directOrganicInboundLeads = 0;
+  const seen = new Set<string>();
+  for (const l of leadsInRange) {
+    if (seen.has(l.id)) continue;
+    seen.add(l.id);
+    if (!l.source || l.source.trim() === "") continue;
+    if (classifyLeadChannel(l.source) === "paidSearch") {
+      paidSearchInboundLeads += 1;
+    } else {
+      directOrganicInboundLeads += 1;
+    }
+  }
+  const paidSearchSpend = paidMediaByCountry.reduce((s, r) => s + r.paidSearch.spend, 0);
+  const paidSearchCostPerLead =
+    paidSearchInboundLeads > 0 ? paidSearchSpend / paidSearchInboundLeads : null;
+  return {
+    paidSearchInboundLeads,
+    paidSearchSpend,
+    paidSearchCostPerLead,
+    directOrganicInboundLeads,
+  };
+}
+
+function emptyRegionStages(): RegionStageCounts {
+  return { newAttempting: 0, engaged: 0, qualified: 0, notPursuing: 0, disqualified: 0, other: 0 };
+}
+
+function stageBucketFromLabel(label: string | null): keyof RegionStageCounts {
+  if (!label) return "other";
+  switch (label) {
+    case "New / Attempting":
+      return "newAttempting";
+    case "Engaged":
+      return "engaged";
+    case "Qualified":
+      return "qualified";
+    case "Not pursuing":
+      return "notPursuing";
+    case "Disqualified":
+      return "disqualified";
+    default:
+      return "other";
+  }
+}
+
+function buildRegionGroupBreakdown(leadsInRange: Lead[]): RegionGroupBreakdown[] {
+  const byGroup = new Map<RegionGroup, {
+    count: number;
+    paidSearchLeads: number;
+    directOrganicLeads: number;
+    stages: RegionStageCounts;
+    countries: Map<string, number>;
+  }>();
+  const seen = new Set<string>();
+  let total = 0;
+  for (const l of leadsInRange) {
+    if (seen.has(l.id)) continue;
+    seen.add(l.id);
+    const countryKey = classifyLeadCountry(l.country);
+    const group: RegionGroup = countryKey != null ? REGION_GROUP_MAP[countryKey] : "Other";
+    const entry = byGroup.get(group) ?? {
+      count: 0,
+      paidSearchLeads: 0,
+      directOrganicLeads: 0,
+      stages: emptyRegionStages(),
+      countries: new Map<string, number>(),
+    };
+    entry.count += 1;
+    total += 1;
+    if (classifyLeadChannel(l.source) === "paidSearch") entry.paidSearchLeads += 1;
+    else entry.directOrganicLeads += 1;
+    const aggregated = l.leadStage ? aggregatedStageLabel(l.leadStage) : null;
+    entry.stages[stageBucketFromLabel(aggregated)] += 1;
+    const rawCountry = (l.country ?? "").trim();
+    if (rawCountry) entry.countries.set(rawCountry, (entry.countries.get(rawCountry) ?? 0) + 1);
+    byGroup.set(group, entry);
+  }
+  const safeTotal = total || 1;
+  const rows: RegionGroupBreakdown[] = [];
+  for (const [group, entry] of byGroup.entries()) {
+    const stagePcts: RegionStageCounts = {
+      newAttempting: pctOf(entry.stages.newAttempting, entry.count),
+      engaged: pctOf(entry.stages.engaged, entry.count),
+      qualified: pctOf(entry.stages.qualified, entry.count),
+      notPursuing: pctOf(entry.stages.notPursuing, entry.count),
+      disqualified: pctOf(entry.stages.disqualified, entry.count),
+      other: pctOf(entry.stages.other, entry.count),
+    };
+    const countries = Array.from(entry.countries.entries())
+      .map(([country, count]) => ({ country, count }))
+      .sort((a, b) => b.count - a.count);
+    rows.push({
+      group,
+      count: entry.count,
+      pct: (entry.count / safeTotal) * 100,
+      paidSearchLeads: entry.paidSearchLeads,
+      directOrganicLeads: entry.directOrganicLeads,
+      priorCount: null,
+      deltaPct: null,
+      stages: entry.stages,
+      stagePcts,
+      qualifiedOutPct: stagePcts.disqualified,
+      countries,
+    });
+  }
+  return rows.sort((a, b) => b.count - a.count);
+}
+
+function pctOf(n: number, denom: number): number {
+  if (denom <= 0) return 0;
+  return (n / denom) * 100;
+}
+
+function buildArrCreated(datasets: ParsedDatasets, range: DateRange): number {
+  let total = 0;
+  for (const d of datasets.closedWonDeals) {
+    if (!inRange(d.closeDate, range)) continue;
+    if (typeof d.annualizedAmount === "number") total += d.annualizedAmount;
+  }
+  return total;
+}
+
+function buildAdvancedStageDeals(datasets: ParsedDatasets, range: DateRange): AdvancedStageDeal[] {
+  const merged = mergeDealLists([
+    datasets.closedWonDeals,
+    datasets.regionalDeals,
+    datasets.paidPipeDeals,
+  ]);
+  const matches = merged.filter((d) => {
+    const refDate = d.closeDate ?? d.createDate;
+    if (!inRange(refDate, range)) return false;
+    return (
+      matchStage(d.dealStage, "contract_live") ||
+      matchStage(d.dealStage, "onboarding") ||
+      matchStage(d.dealStage, "achieving_impact")
+    );
+  });
+  return matches
+    .map((d) => ({
+      dealName: d.dealName ?? "(unnamed deal)",
+      company: d.company ?? "—",
+      country: d.country ?? null,
+      stage: d.dealStage ?? "—",
+      amount: d.amount ?? d.annualizedAmount ?? 0,
+    }))
+    .sort((a, b) => b.amount - a.amount);
 }
