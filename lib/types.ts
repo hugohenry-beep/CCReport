@@ -4,6 +4,8 @@ export const STAGE_KEYWORDS = {
   demo: ["demo"],
   negotiating: ["negotiation", "negotiating"],
   contract_live: ["contract is live", "contract live", "live contract"],
+  onboarding: ["onboarding"],
+  achieving_impact: ["achieving impact"],
 } as const;
 
 export type StageTarget = keyof typeof STAGE_KEYWORDS;
@@ -131,6 +133,39 @@ export interface CountryChannelRow {
   display: ChannelMetrics;
 }
 
+export type RegionGroup = "USA & Canada" | "Europe & ROW" | "LATAM" | "Australia" | "Other";
+
+export interface RegionStageCounts {
+  newAttempting: number;
+  engaged: number;
+  qualified: number;
+  notPursuing: number;
+  disqualified: number;
+  other: number;
+}
+
+export interface RegionGroupBreakdown {
+  group: RegionGroup;
+  count: number;
+  pct: number;
+  paidSearchLeads: number;
+  directOrganicLeads: number;
+  priorCount: number | null;
+  deltaPct: number | null;
+  stages: RegionStageCounts;
+  stagePcts: RegionStageCounts;
+  qualifiedOutPct: number;
+  countries: { country: string; count: number }[];
+}
+
+export interface AdvancedStageDeal {
+  dealName: string;
+  company: string;
+  country: string | null;
+  stage: string;
+  amount: number;
+}
+
 export interface PeriodMetrics {
   inboundLeadCount: number;
   bySource: SourceBreakdown[];
@@ -147,6 +182,16 @@ export interface PeriodMetrics {
   enteredContractLiveDeals: HighValueDeal[];
   paidMediaByCountry?: CountryChannelRow[];
   unclassifiedCampaigns?: string[];
+
+  // Narrative-recap extensions
+  paidSearchInboundLeads: number;
+  paidSearchSpend: number;
+  paidSearchCostPerLead: number | null;
+  directOrganicInboundLeads: number;
+  arrCreated: number;
+  byRegionGroup: RegionGroupBreakdown[];
+  inactiveRegionGroups: RegionGroup[];
+  advancedStageDeals: AdvancedStageDeal[];
 }
 
 export interface ComparisonInfo {

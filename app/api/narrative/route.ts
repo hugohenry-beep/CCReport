@@ -8,7 +8,7 @@ import { markdownToHtml } from "@/lib/render/html";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const LLM_MARKER_RE = /<!--\s*\/?LLM:[A-Z]+\s*-->/g;
+const LLM_MARKER_RE = /<!--\s*\/?LLM:[A-Z_]+\s*-->/g;
 
 export async function POST(req: NextRequest) {
   try {
