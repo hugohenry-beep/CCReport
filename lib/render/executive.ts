@@ -25,20 +25,31 @@
  *       - DEMO stalled with no NEGOTIATING uplift
  *       - any metrics.warnings
  *  9. Compact data-provenance footer (period, prior, ads label, comparison source).
- * 10. Plain confident language. No fluff. No causation speculation. No hedging.
+ * 10. Plain confident language. No fluff. No hedging. Causal hypotheses
+ *     ("driven by", "because of") are off-limits — attribution data isn't in
+ *     this report. Pattern-level observation ("third week of decline",
+ *     "biggest jump in the comparison window") is encouraged inside the
+ *     analytical blocks.
  * 11. Numbers are sacred — programmatic source of truth. LLM may NOT invent.
  * 12. Mobile-friendly markdown — bullets > tables. Reserve tables for ≥5-row
  *     breakdowns (high-value deals, contract-live entries).
+ * 13. Analytical narrative goes in three dedicated blocks (summary,
+ *     efficiency take, outlook). Scannable zones (TL;DR, scorecard, what
+ *     moved, pipeline health, watch) stay bullet-tight.
  *
  * SKELETON (fixed order):
- *   HEADLINE → TL;DR → SCORECARD → WHAT MOVED → PIPELINE HEALTH →
- *   HIGH-VALUE DEALS → EFFICIENCY → WATCH THIS WEEK → FOOTER.
+ *   HEADLINE → EXECUTIVE SUMMARY → TL;DR → SCORECARD → WHAT MOVED →
+ *   PIPELINE HEALTH → HIGH-VALUE DEALS → EFFICIENCY → EFFICIENCY TAKE →
+ *   WATCH THIS WEEK → OUTLOOK → FOOTER.
  *
- * LLM rewrites ONLY four prose zones, delimited by HTML comment markers:
- *   <!-- LLM:HEADLINE -->...<!-- /LLM:HEADLINE -->
- *   <!-- LLM:TLDR -->...<!-- /LLM:TLDR -->
- *   <!-- LLM:WHATMOVED -->...<!-- /LLM:WHATMOVED -->
- *   <!-- LLM:WATCH -->...<!-- /LLM:WATCH -->
+ * LLM rewrites SEVEN prose zones, delimited by HTML comment markers:
+ *   <!-- LLM:HEADLINE -->...<!-- /LLM:HEADLINE -->        (1 sentence)
+ *   <!-- LLM:SUMMARY -->...<!-- /LLM:SUMMARY -->          (2-3 sentence narrative)
+ *   <!-- LLM:TLDR -->...<!-- /LLM:TLDR -->                (3-5 bullets)
+ *   <!-- LLM:WHATMOVED -->...<!-- /LLM:WHATMOVED -->      (bullets)
+ *   <!-- LLM:EFFICIENCYTAKE -->...<!-- /LLM:EFFICIENCYTAKE --> (1-2 sentences)
+ *   <!-- LLM:WATCH -->...<!-- /LLM:WATCH -->              (bullets)
+ *   <!-- LLM:OUTLOOK -->...<!-- /LLM:OUTLOOK -->          (1-2 sentences)
  * Validator rejects any LLM output containing numeric tokens not in the
  * programmatic whitelist. On failure, the route silently returns the
  * programmatic markdown unchanged.
@@ -72,13 +83,16 @@ export function renderExecutiveMarkdown(m: Metrics): string {
 function renderExecutiveMarkdownFromFacts(facts: ExecutiveFacts): string {
   const lines: string[] = [];
   renderHeadline(lines, facts);
+  renderSummary(lines, facts);
   renderTldr(lines, facts);
   renderScorecard(lines, facts);
   renderWhatMoved(lines, facts);
   renderPipelineHealth(lines, facts);
   renderHighValueDeals(lines, facts);
   renderEfficiency(lines, facts);
+  renderEfficiencyTake(lines, facts);
   renderWatch(lines, facts);
+  renderOutlook(lines, facts);
   renderFooter(lines, facts);
   return lines.join("\n");
 }
@@ -91,6 +105,16 @@ function renderHeadline(lines: string[], facts: ExecutiveFacts): void {
   lines.push(`> ${facts.headline.sentence}`);
   pushTokensFromSentence(facts, facts.headline.sentence);
   lines.push("<!-- /LLM:HEADLINE -->");
+  lines.push("");
+}
+
+function renderSummary(lines: string[], facts: ExecutiveFacts): void {
+  lines.push("## Executive summary");
+  lines.push("");
+  lines.push("<!-- LLM:SUMMARY -->");
+  lines.push(facts.analysis.summary);
+  pushTokensFromSentence(facts, facts.analysis.summary);
+  lines.push("<!-- /LLM:SUMMARY -->");
   lines.push("");
 }
 
@@ -220,6 +244,7 @@ function formatPipelineLine(d: DeltaPct, hasPrior: boolean): string {
 
 function renderHighValueDeals(lines: string[], facts: ExecutiveFacts): void {
   lines.push("## High-value inbound deals (>$15K)");
+  pushWhitelist(facts, "$15K", "$15,000", "15000");
   lines.push("");
   if (facts.highValue.count === 0) {
     lines.push("_None this period._");
@@ -272,6 +297,26 @@ function renderEfficiency(lines: string[], facts: ExecutiveFacts): void {
     }
     pushDeltaTokens(facts, pps);
   }
+  lines.push("");
+}
+
+function renderEfficiencyTake(lines: string[], facts: ExecutiveFacts): void {
+  lines.push("### Efficiency take");
+  lines.push("");
+  lines.push("<!-- LLM:EFFICIENCYTAKE -->");
+  lines.push(facts.analysis.efficiencyTake);
+  pushTokensFromSentence(facts, facts.analysis.efficiencyTake);
+  lines.push("<!-- /LLM:EFFICIENCYTAKE -->");
+  lines.push("");
+}
+
+function renderOutlook(lines: string[], facts: ExecutiveFacts): void {
+  lines.push("## Outlook & recommendation");
+  lines.push("");
+  lines.push("<!-- LLM:OUTLOOK -->");
+  lines.push(facts.analysis.outlook);
+  pushTokensFromSentence(facts, facts.analysis.outlook);
+  lines.push("<!-- /LLM:OUTLOOK -->");
   lines.push("");
 }
 
