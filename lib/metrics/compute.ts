@@ -63,11 +63,7 @@ export function compute(datasets: ParsedDatasets, opts: ComputeOptions): Metrics
   let prior: PeriodMetrics | null = null;
   let comparisonInfo: ComparisonInfo;
 
-  const priorFromUpload = computeForPeriod(datasets, priorRange);
-  if (datasetsCoverRange(datasets, priorRange)) {
-    prior = priorFromUpload;
-    comparisonInfo = { source: "current_upload" };
-  } else if (priorSnapshotMetrics && priorSnapshot) {
+  if (priorSnapshotMetrics && priorSnapshot) {
     prior = priorSnapshotMetrics;
     comparisonInfo = {
       source: "stored_snapshot",
@@ -75,6 +71,9 @@ export function compute(datasets: ParsedDatasets, opts: ComputeOptions): Metrics
       snapshotPeriodStart: priorSnapshot.periodStart.toISOString(),
       snapshotPeriodEnd: priorSnapshot.periodEnd.toISOString(),
     };
+  } else if (datasetsCoverRange(datasets, priorRange)) {
+    prior = computeForPeriod(datasets, priorRange);
+    comparisonInfo = { source: "current_upload" };
   } else {
     comparisonInfo = { source: "none" };
   }
@@ -93,6 +92,41 @@ export function compute(datasets: ParsedDatasets, opts: ComputeOptions): Metrics
     priorPeriodEnd: priorRange.end.toISOString(),
     adsPeriodLabel: datasets.adsPeriodLabel,
     warnings: datasets.warnings,
+  };
+}
+
+/**
+ * Replace a stored Metrics object's prior block (and comparison info) with a
+ * new one, regenerating any derived deltas that depend on the prior. Used by
+ * the "recompute prior" action to fix already-saved reports when a matching
+ * prior snapshot becomes available.
+ */
+export function applyPriorToMetrics(
+  metrics: Metrics,
+  prior: PeriodMetrics | null,
+  comparisonInfo: ComparisonInfo,
+): Metrics {
+  const next: Metrics = {
+    ...metrics,
+    current: deepCloneRegionGroupDeltas(metrics.current),
+    prior,
+    comparisonInfo,
+  };
+  if (prior) {
+    enrichRegionGroupDeltas(next.current, prior);
+  } else {
+    for (const row of next.current.byRegionGroup ?? []) {
+      row.priorCount = null;
+      row.deltaPct = null;
+    }
+  }
+  return next;
+}
+
+function deepCloneRegionGroupDeltas(current: PeriodMetrics): PeriodMetrics {
+  return {
+    ...current,
+    byRegionGroup: (current.byRegionGroup ?? []).map((row) => ({ ...row })),
   };
 }
 

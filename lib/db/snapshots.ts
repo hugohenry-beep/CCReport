@@ -35,6 +35,51 @@ export async function findPriorSnapshot(currentPeriodStart: Date) {
   });
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export interface MatchingPriorSnapshotOptions {
+  toleranceDays?: number;
+  excludeId?: string;
+}
+
+/**
+ * Find a stored report whose period closely matches the expected prior range.
+ * Both periodStart and periodEnd must fall within ±toleranceDays of the
+ * corresponding edge of priorRange. When several candidates qualify, the one
+ * whose edges are collectively closest to priorRange wins; ties break to the
+ * most recently created snapshot.
+ */
+export async function findMatchingPriorSnapshot(
+  priorRange: { start: Date; end: Date },
+  opts: MatchingPriorSnapshotOptions = {},
+) {
+  const toleranceDays = opts.toleranceDays ?? 2;
+  const tolMs = toleranceDays * DAY_MS;
+  const startLo = new Date(priorRange.start.getTime() - tolMs);
+  const startHi = new Date(priorRange.start.getTime() + tolMs);
+  const endLo = new Date(priorRange.end.getTime() - tolMs);
+  const endHi = new Date(priorRange.end.getTime() + tolMs);
+
+  const candidates = await prisma.reportSnapshot.findMany({
+    where: {
+      periodStart: { gte: startLo, lte: startHi },
+      periodEnd: { gte: endLo, lte: endHi },
+      ...(opts.excludeId ? { NOT: { id: opts.excludeId } } : {}),
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (candidates.length === 0) return null;
+
+  const scored = candidates.map((s) => {
+    const startDiff = Math.abs(s.periodStart.getTime() - priorRange.start.getTime());
+    const endDiff = Math.abs(s.periodEnd.getTime() - priorRange.end.getTime());
+    return { snapshot: s, diff: startDiff + endDiff };
+  });
+  scored.sort((a, b) => a.diff - b.diff);
+  return scored[0].snapshot;
+}
+
 export async function listRecentSnapshots(limit = 20) {
   return prisma.reportSnapshot.findMany({
     orderBy: { createdAt: "desc" },
