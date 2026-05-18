@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { Metrics } from "@/lib/types";
 import { BreakdownBarChart } from "./charts/BreakdownBarChart";
 import { ComparisonBarChart } from "./charts/ComparisonBarChart";
+import { fmtMoney, fmtNumber } from "@/lib/render/format";
 
 interface Section {
   id: string;
@@ -109,19 +110,39 @@ export default function SectionedReport({ bodyHtml, metrics }: SectionedReportPr
 
   function SectionEnhancements({ sectionId, metrics }: { sectionId: string; metrics: Metrics }) {
     if (sectionId === slugify("Headline numbers")) {
-      const data = [
-        { metric: "Leads", current: c.inboundLeadCount, prior: p?.inboundLeadCount ?? 0 },
-        { metric: "Ad spend", current: c.adSpend, prior: p?.adSpend ?? 0 },
-        { metric: "Pipeline", current: c.totalDealValue, prior: p?.totalDealValue ?? 0 },
-      ];
       if (!p) return null;
       return (
-        <div className="mb-4">
-          <ComparisonBarChart
-            title="Current vs prior period"
-            description="Headline metrics across both periods."
-            data={data}
-          />
+        <div className="mb-4 space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ComparisonBarChart
+              title="Ad spend"
+              data={[{ metric: "Ad spend", current: c.adSpend, prior: p.adSpend }]}
+              valueFormatter={fmtMoney}
+            />
+            <ComparisonBarChart
+              title="Pipeline generated"
+              data={[{ metric: "Pipeline", current: c.totalDealValue, prior: p.totalDealValue }]}
+              valueFormatter={fmtMoney}
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ComparisonBarChart
+              title="Inbound leads"
+              data={[{ metric: "Leads", current: c.inboundLeadCount, prior: p.inboundLeadCount }]}
+              valueFormatter={fmtNumber}
+            />
+            <ComparisonBarChart
+              title="Cost per lead"
+              data={[
+                {
+                  metric: "Cost / lead",
+                  current: c.costPerLead ?? 0,
+                  prior: p.costPerLead ?? 0,
+                },
+              ]}
+              valueFormatter={fmtMoney}
+            />
+          </div>
         </div>
       );
     }
