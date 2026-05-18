@@ -132,10 +132,10 @@ export default function SectionedReport({ bodyHtml, metrics }: SectionedReportPr
               valueFormatter={fmtNumber}
             />
             <ComparisonBarChart
-              title="Cost per lead"
+              title="Cost per paid search lead"
               data={[
                 {
-                  metric: "Cost / lead",
+                  metric: "CPL",
                   current: c.costPerLead ?? 0,
                   prior: p.costPerLead ?? 0,
                 },

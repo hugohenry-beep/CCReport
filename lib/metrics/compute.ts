@@ -166,7 +166,6 @@ function computeForPeriod(datasets: ParsedDatasets, range: DateRange): PeriodMet
   const dealsInRange = datasets.paidPipeDeals.filter((d) => inRange(d.createDate, range));
   const totalDealValue = dealsInRange.reduce((s, d) => s + (d.amount ?? 0), 0);
 
-  const costPerLead = inboundLeadCount > 0 ? adSpend / inboundLeadCount : null;
   const costPerDealDollar = totalDealValue > 0 ? adSpend / totalDealValue : null;
 
   const highValueDeals = dealsInRange
@@ -190,6 +189,9 @@ function computeForPeriod(datasets: ParsedDatasets, range: DateRange): PeriodMet
   );
 
   const paidSearchTotals = buildPaidSearchTotals(leadsInRange, paidMediaByCountry);
+  // Single source of truth for "cost per lead": paid-search spend ÷ paid-search leads.
+  // Blending Google Ads spend across all leads (incl. direct/organic) understated CPL.
+  const costPerLead = paidSearchTotals.paidSearchCostPerLead;
   const byRegionGroup = buildRegionGroupBreakdown(leadsInRange);
   const inactiveRegionGroups = inboundLeadCount > 0
     ? ALL_REGION_GROUPS.filter((g) => !byRegionGroup.some((r) => r.group === g && r.count > 0))

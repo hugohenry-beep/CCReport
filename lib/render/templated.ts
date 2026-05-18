@@ -25,9 +25,9 @@ export function renderTemplatedMarkdown(m: Metrics): string {
   lines.push(`- **Total Google Ads spend:** ${fmtMoney(c.adSpend)} ${deltaMoney(c.adSpend, p?.adSpend)}`);
   lines.push(`- **Total deal value created:** ${fmtMoney(c.totalDealValue)} ${deltaMoney(c.totalDealValue, p?.totalDealValue)}`);
   if (c.costPerLead != null) {
-    lines.push(`- **Cost per inbound lead:** ${fmtMoney(c.costPerLead)} ${deltaMoney(c.costPerLead, p?.costPerLead ?? null)}`);
+    lines.push(`- **Cost per paid search lead:** ${fmtMoney(c.costPerLead)} ${deltaMoney(c.costPerLead, p?.costPerLead ?? null)}`);
   } else {
-    lines.push(`- **Cost per inbound lead:** — (no leads in period)`);
+    lines.push(`- **Cost per paid search lead:** — (no paid search leads in period)`);
   }
   lines.push(``);
 
@@ -80,7 +80,7 @@ export function renderTemplatedMarkdown(m: Metrics): string {
   lines.push(`| Spend | ${fmtMoney(c.adSpend)} | ${p ? fmtMoney(p.adSpend) : "—"} |`);
   lines.push(`| Inbound leads | ${fmtNumber(c.inboundLeadCount)} | ${p ? fmtNumber(p.inboundLeadCount) : "—"} |`);
   lines.push(`| Pipeline created | ${fmtMoney(c.totalDealValue)} | ${p ? fmtMoney(p.totalDealValue) : "—"} |`);
-  lines.push(`| Cost per lead | ${c.costPerLead != null ? fmtMoney(c.costPerLead) : "—"} | ${p?.costPerLead != null ? fmtMoney(p.costPerLead) : "—"} |`);
+  lines.push(`| Cost per paid search lead | ${c.costPerLead != null ? fmtMoney(c.costPerLead) : "—"} | ${p?.costPerLead != null ? fmtMoney(p.costPerLead) : "—"} |`);
   lines.push(`| Spend / pipeline $ | ${c.costPerDealDollar != null ? c.costPerDealDollar.toFixed(3) : "—"} | ${p?.costPerDealDollar != null ? p.costPerDealDollar.toFixed(3) : "—"} |`);
   lines.push(``);
 
@@ -149,7 +149,7 @@ function periodSummaryParagraph(c: PeriodMetrics, p: PeriodMetrics): string {
   const leads = describePctChange(c.inboundLeadCount, p.inboundLeadCount, fmtNumber);
   const spend = describePctChange(c.adSpend, p.adSpend, fmtMoney);
   const cpl = describePctChange(c.costPerLead ?? 0, p.costPerLead ?? 0, fmtMoney);
-  return `Inbound lead volume is **${leads}**. Google Ads spend is **${spend}**, and cost-per-lead is **${cpl}**.`;
+  return `Inbound lead volume is **${leads}**. Google Ads spend is **${spend}**, and cost per paid search lead is **${cpl}**.`;
 }
 
 function describePctChange(curr: number, prior: number, fmt: (n: number) => string): string {

@@ -90,5 +90,14 @@ export async function listRecentSnapshots(limit = 20) {
 export function extractPriorPeriodMetrics(metricsJson: unknown): PeriodMetrics | null {
   if (!metricsJson || typeof metricsJson !== "object") return null;
   const m = metricsJson as Partial<Metrics>;
-  return m.current ?? null;
+  const cur = m.current ?? null;
+  if (!cur) return null;
+  // Older snapshots stored `costPerLead` as adSpend / inboundLeadCount (blended
+  // across organic + paid leads), while `paidSearchCostPerLead` was already the
+  // paid-only figure used in the written report. Normalize so the dashboard's
+  // "Cost per paid search lead" delta against a legacy prior is apples-to-apples.
+  if (cur.paidSearchCostPerLead != null && cur.costPerLead !== cur.paidSearchCostPerLead) {
+    return { ...cur, costPerLead: cur.paidSearchCostPerLead };
+  }
+  return cur;
 }
