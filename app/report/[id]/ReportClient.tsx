@@ -13,6 +13,7 @@ import {
   FileCode,
   FileText,
   FileSpreadsheet,
+  History,
   MoreHorizontal,
   Pencil,
   Sparkles,
@@ -88,6 +89,7 @@ export default function ReportClient({
   const [error, setError] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
 
   const sections = useMemo(() => deriveSectionTitles(initialHtml), [initialHtml]);
 
@@ -159,6 +161,35 @@ export default function ReportClient({
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      setBusy(false);
+    }
+  }
+
+  async function recomputePrior() {
+    setError(null);
+    setInfo(null);
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/reports/${reportId}/recompute-prior`, {
+        method: "POST",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error ?? `Recompute failed (${res.status})`);
+      }
+      if (body.matched) {
+        const range =
+          body.snapshotPeriodStart && body.snapshotPeriodEnd
+            ? ` (${new Date(body.snapshotPeriodStart).toLocaleDateString()} – ${new Date(body.snapshotPeriodEnd).toLocaleDateString()})`
+            : "";
+        setInfo(`Prior comparison recomputed against stored snapshot${range}.`);
+        router.refresh();
+      } else {
+        setInfo("No matching prior report found (within ±2 days of the prior period).");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
       setBusy(false);
     }
   }
@@ -308,6 +339,9 @@ export default function ReportClient({
               >
                 <Pencil className="h-3.5 w-3.5" /> Rename
               </DropdownMenuItem>
+              <DropdownMenuItem disabled={busy} onSelect={() => recomputePrior()}>
+                <History className="h-3.5 w-3.5" /> Recompute prior
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem destructive onSelect={() => setConfirmDeleteOpen(true)}>
                 <Trash2 className="h-3.5 w-3.5" /> Delete
@@ -370,6 +404,13 @@ export default function ReportClient({
           <div className="mt-4 rounded-md border border-danger/40 bg-danger-soft px-3 py-2 text-sm text-danger flex items-start gap-2">
             <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
             <span>{error}</span>
+          </div>
+        )}
+
+        {info && (
+          <div className="mt-4 rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-sm text-text flex items-start gap-2">
+            <Check className="h-4 w-4 shrink-0 mt-0.5 text-accent" />
+            <span>{info}</span>
           </div>
         )}
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { parseAll } from "@/lib/parsers";
 import type { NamedFile } from "@/lib/parsers/unzip";
 import { compute } from "@/lib/metrics/compute";
-import { extractPriorPeriodMetrics, findPriorSnapshot, saveSnapshot } from "@/lib/db/snapshots";
+import { extractPriorPeriodMetrics, findMatchingPriorSnapshot, saveSnapshot } from "@/lib/db/snapshots";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -42,7 +42,12 @@ export async function POST(req: NextRequest) {
 
     const datasets = parseAll(namedFiles);
 
-    const priorSnapshot = await findPriorSnapshot(start);
+    const duration = end.getTime() - start.getTime();
+    const priorRange = {
+      start: new Date(start.getTime() - duration),
+      end: start,
+    };
+    const priorSnapshot = await findMatchingPriorSnapshot(priorRange);
     const priorMetrics = priorSnapshot
       ? extractPriorPeriodMetrics(priorSnapshot.metricsJson as unknown)
       : null;
