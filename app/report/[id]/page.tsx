@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getSnapshot } from "@/lib/db/snapshots";
+import { getSnapshot, normalizeStoredMetrics } from "@/lib/db/snapshots";
 import { renderTemplatedMarkdown } from "@/lib/render/templated";
 import { markdownToHtml } from "@/lib/render/html";
 import type { Metrics } from "@/lib/types";
@@ -19,7 +19,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const snap = await getSnapshot(id);
   if (!snap) return notFound();
-  const metrics = snap.metricsJson as unknown as Metrics;
+  const metrics = normalizeStoredMetrics(snap.metricsJson) ?? (snap.metricsJson as unknown as Metrics);
   const md = renderTemplatedMarkdown(metrics);
   const html = await markdownToHtml(md);
 

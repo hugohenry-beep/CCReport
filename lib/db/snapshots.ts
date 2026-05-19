@@ -87,17 +87,30 @@ export async function listRecentSnapshots(limit = 20) {
   });
 }
 
-export function extractPriorPeriodMetrics(metricsJson: unknown): PeriodMetrics | null {
-  if (!metricsJson || typeof metricsJson !== "object") return null;
-  const m = metricsJson as Partial<Metrics>;
-  const cur = m.current ?? null;
-  if (!cur) return null;
-  // Older snapshots stored `costPerLead` as adSpend / inboundLeadCount (blended
-  // across organic + paid leads), while `paidSearchCostPerLead` was already the
-  // paid-only figure used in the written report. Normalize so the dashboard's
-  // "Cost per paid search lead" delta against a legacy prior is apples-to-apples.
-  if (cur.paidSearchCostPerLead != null && cur.costPerLead !== cur.paidSearchCostPerLead) {
-    return { ...cur, costPerLead: cur.paidSearchCostPerLead };
+/**
+ * Older snapshots stored `costPerLead` as adSpend / inboundLeadCount (blended
+ * across organic + paid leads), while `paidSearchCostPerLead` was already the
+ * paid-only figure used in the written report. Rewrite the field at read time
+ * so every surface (dashboard tiles, charts, markdown, PDF) sees one number.
+ */
+function normalizePeriodMetrics(p: PeriodMetrics): PeriodMetrics {
+  if (p.paidSearchCostPerLead != null && p.costPerLead !== p.paidSearchCostPerLead) {
+    return { ...p, costPerLead: p.paidSearchCostPerLead };
   }
-  return cur;
+  return p;
+}
+
+export function normalizeStoredMetrics(metricsJson: unknown): Metrics | null {
+  if (!metricsJson || typeof metricsJson !== "object") return null;
+  const m = metricsJson as Metrics;
+  if (!m.current) return m;
+  const current = normalizePeriodMetrics(m.current);
+  const prior = m.prior ? normalizePeriodMetrics(m.prior) : null;
+  if (current === m.current && prior === m.prior) return m;
+  return { ...m, current, prior };
+}
+
+export function extractPriorPeriodMetrics(metricsJson: unknown): PeriodMetrics | null {
+  const m = normalizeStoredMetrics(metricsJson);
+  return m?.current ?? null;
 }

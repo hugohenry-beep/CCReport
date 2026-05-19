@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-import { getSnapshot } from "@/lib/db/snapshots";
+import { getSnapshot, normalizeStoredMetrics } from "@/lib/db/snapshots";
 import { buildPromptInputs } from "@/lib/xlsx-export/llmCellPrompt";
 import type { Metrics } from "@/lib/types";
 
@@ -16,7 +16,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   const snap = await getSnapshot(id);
   if (!snap) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const metrics = snap.metricsJson as unknown as Metrics;
+  const metrics = normalizeStoredMetrics(snap.metricsJson) ?? (snap.metricsJson as unknown as Metrics);
   const { systemPrompt, schema } = buildPromptInputs(metrics);
   const userPayload = JSON.stringify({ METRICS_JSON: metrics, CELL_SCHEMA: schema });
 

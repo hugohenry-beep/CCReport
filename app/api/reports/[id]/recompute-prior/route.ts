@@ -5,6 +5,7 @@ import {
   extractPriorPeriodMetrics,
   findMatchingPriorSnapshot,
   getSnapshot,
+  normalizeStoredMetrics,
 } from "@/lib/db/snapshots";
 import { applyPriorToMetrics } from "@/lib/metrics/compute";
 import type { ComparisonInfo, Metrics } from "@/lib/types";
@@ -23,7 +24,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       return NextResponse.json({ error: "Report not found" }, { status: 404 });
     }
 
-    const metrics = snap.metricsJson as unknown as Metrics;
+    const metrics =
+      normalizeStoredMetrics(snap.metricsJson) ?? (snap.metricsJson as unknown as Metrics);
     const duration = snap.periodEnd.getTime() - snap.periodStart.getTime();
     const priorRange = {
       start: new Date(snap.periodStart.getTime() - duration),

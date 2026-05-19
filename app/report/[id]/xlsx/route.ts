@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSnapshot } from "@/lib/db/snapshots";
+import { getSnapshot, normalizeStoredMetrics } from "@/lib/db/snapshots";
 import { renderReportXlsx } from "@/lib/xlsx-export";
 import type { Metrics } from "@/lib/types";
 
@@ -16,7 +16,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const { id } = await ctx.params;
   const snap = await getSnapshot(id);
   if (!snap) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const metrics = snap.metricsJson as unknown as Metrics;
+  const metrics = normalizeStoredMetrics(snap.metricsJson) ?? (snap.metricsJson as unknown as Metrics);
   const buf = await renderReportXlsx(metrics, snap.name);
   const filename = safeFilename(snap.name, id, new Date(metrics.periodEnd));
   const body = new Uint8Array(buf);

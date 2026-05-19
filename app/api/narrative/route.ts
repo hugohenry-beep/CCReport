@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSnapshot } from "@/lib/db/snapshots";
+import { getSnapshot, normalizeStoredMetrics } from "@/lib/db/snapshots";
 import { renderExecutiveBriefing } from "@/lib/render/executive";
 import { enhanceExecutiveNarrative } from "@/lib/render/narrative";
 import type { Metrics } from "@/lib/types";
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     if (!snap) {
       return NextResponse.json({ error: "Report not found" }, { status: 404 });
     }
-    const metrics = snap.metricsJson as unknown as Metrics;
+    const metrics = normalizeStoredMetrics(snap.metricsJson) ?? (snap.metricsJson as unknown as Metrics);
     const { markdown: programmatic, facts } = renderExecutiveBriefing(metrics);
     const enhanced = await enhanceExecutiveNarrative(programmatic, facts, metrics);
     const cleaned = enhanced.replace(LLM_MARKER_RE, "").replace(/\n{3,}/g, "\n\n").trim();
