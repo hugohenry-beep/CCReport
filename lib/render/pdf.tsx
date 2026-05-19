@@ -92,7 +92,7 @@ function ReportPdf({ metrics }: { metrics: Metrics }) {
         <Text style={styles.bullet}>• Inbound leads generated: {fmtNumber(c.inboundLeadCount)} {p ? `(prior: ${fmtNumber(p.inboundLeadCount)})` : ""}</Text>
         <Text style={styles.bullet}>• Total Google Ads spend: {fmtMoney(c.adSpend)} {p ? `(prior: ${fmtMoney(p.adSpend)})` : ""}</Text>
         <Text style={styles.bullet}>• Total deal value created: {fmtMoney(c.totalDealValue)} {p ? `(prior: ${fmtMoney(p.totalDealValue)})` : ""}</Text>
-        <Text style={styles.bullet}>• Cost per inbound lead: {c.costPerLead != null ? fmtMoney(c.costPerLead) : "—"} {p?.costPerLead != null ? `(prior: ${fmtMoney(p.costPerLead)})` : ""}</Text>
+        <Text style={styles.bullet}>• Cost per paid search lead: {c.costPerLead != null ? fmtMoney(c.costPerLead) : "—"} {p?.costPerLead != null ? `(prior: ${fmtMoney(p.costPerLead)})` : ""}</Text>
 
         <Text style={styles.h2}>Inbound leads by source</Text>
         <BreakdownTable
@@ -147,7 +147,7 @@ function ReportPdf({ metrics }: { metrics: Metrics }) {
             <Text style={styles.td}>{p ? fmtMoney(p.totalDealValue) : "—"}</Text>
           </View>
           <View style={styles.row}>
-            <Text style={styles.td}>Cost per lead</Text>
+            <Text style={styles.td}>Cost per paid search lead</Text>
             <Text style={styles.td}>{c.costPerLead != null ? fmtMoney(c.costPerLead) : "—"}</Text>
             <Text style={styles.td}>{p?.costPerLead != null ? fmtMoney(p.costPerLead) : "—"}</Text>
           </View>

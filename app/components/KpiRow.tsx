@@ -38,13 +38,13 @@ export function KpiRow({ metrics }: KpiRowProps) {
         icon={<TrendingUp className="h-4 w-4" />}
       />
       <KpiCard
-        label="Cost per lead"
+        label="Cost per paid search lead"
         value={c.costPerLead != null ? fmtMoney(c.costPerLead) : "—"}
         current={c.costPerLead ?? 0}
         prior={p?.costPerLead ?? null}
         formatPrior={fmtMoney}
         positiveIsGood={false}
-        hint={c.costPerLead == null ? "no leads in period" : undefined}
+        hint={c.costPerLead == null ? "no paid search leads in period" : undefined}
         icon={<LineChart className="h-4 w-4" />}
       />
     </div>
