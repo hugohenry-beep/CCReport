@@ -67,6 +67,18 @@ export const DATE_RANGE_PRESETS: DateRangePreset[] = [
     },
   },
   {
+    id: "last2Weeks",
+    label: "Past 2 full weeks",
+    compute: (today) => {
+      const thisMon = startOfWeekMonday(today);
+      const twoMondaysAgo = new Date(thisMon);
+      twoMondaysAgo.setDate(twoMondaysAgo.getDate() - 14);
+      const lastSun = new Date(thisMon);
+      lastSun.setDate(lastSun.getDate() - 1);
+      return { start: toDateInput(twoMondaysAgo), end: toDateInput(lastSun) };
+    },
+  },
+  {
     id: "thisMonth",
     label: "Month-to-date",
     compute: (today) => {

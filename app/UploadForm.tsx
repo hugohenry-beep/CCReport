@@ -8,6 +8,7 @@ import {
   FileSpreadsheet,
   FileArchive,
   FileQuestion,
+  Layers,
   X,
 } from "lucide-react";
 import { Button } from "./components/ui/Button";
@@ -34,6 +35,13 @@ interface ChipFile {
   id: string;
 }
 
+interface CombinableSnapshot {
+  id: string;
+  name: string | null;
+  periodStart: string;
+  periodEnd: string;
+}
+
 const PROGRESS_PHASES = [
   "Uploading files…",
   "Parsing exports…",
@@ -41,6 +49,19 @@ const PROGRESS_PHASES = [
   "Comparing to prior period…",
   "Saving snapshot…",
 ];
+
+const COMBINE_PHASES = [
+  "Loading existing reports…",
+  "Combining metrics…",
+  "Comparing to prior period…",
+  "Saving snapshot…",
+];
+
+function formatPeriodLabel(startIso: string, endIso: string): string {
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return `${fmt(startIso)} – ${fmt(endIso)}`;
+}
 
 export default function UploadForm() {
   const router = useRouter();
@@ -50,9 +71,11 @@ export default function UploadForm() {
   const [periodStart, setPeriodStart] = useState<string>(initial.start);
   const [periodEnd, setPeriodEnd] = useState<string>(initial.end);
   const [busy, setBusy] = useState(false);
+  const [busyMode, setBusyMode] = useState<"upload" | "combine">("upload");
   const [phaseIdx, setPhaseIdx] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [combinable, setCombinable] = useState<CombinableSnapshot[] | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const activePresetId = matchPreset({ start: periodStart, end: periodEnd });
@@ -111,12 +134,84 @@ export default function UploadForm() {
   useEffect(() => {
     if (!busy) return;
     setPhaseIdx(0);
+    const phases = busyMode === "combine" ? COMBINE_PHASES : PROGRESS_PHASES;
     const timeouts: ReturnType<typeof setTimeout>[] = [];
-    for (let i = 1; i < PROGRESS_PHASES.length; i++) {
+    for (let i = 1; i < phases.length; i++) {
       timeouts.push(setTimeout(() => setPhaseIdx(i), i * 1400));
     }
     return () => timeouts.forEach(clearTimeout);
-  }, [busy]);
+  }, [busy, busyMode]);
+
+  // Check whether existing stored reports cleanly tile the picked range. If
+  // so, surface a card that lets the user skip the file upload entirely.
+  useEffect(() => {
+    if (!periodStart || !periodEnd) {
+      setCombinable(null);
+      return;
+    }
+    if (new Date(periodStart) >= new Date(periodEnd)) {
+      setCombinable(null);
+      return;
+    }
+
+    const ctrl = new AbortController();
+    const handle = setTimeout(() => {
+      const startIso = new Date(periodStart).toISOString();
+      const endIso = (() => {
+        const d = new Date(periodEnd);
+        d.setHours(23, 59, 59, 999);
+        return d.toISOString();
+      })();
+      const qs = new URLSearchParams({ start: startIso, end: endIso });
+      fetch(`/api/combinable?${qs.toString()}`, { signal: ctrl.signal })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (!data) return;
+          const snaps = data?.tiling?.snapshots as CombinableSnapshot[] | undefined;
+          setCombinable(snaps && snaps.length > 0 ? snaps : null);
+        })
+        .catch((err) => {
+          if (err?.name !== "AbortError") setCombinable(null);
+        });
+    }, 250);
+
+    return () => {
+      ctrl.abort();
+      clearTimeout(handle);
+    };
+  }, [periodStart, periodEnd]);
+
+  async function onBuildFromExisting() {
+    if (!combinable || combinable.length === 0) return;
+    setError(null);
+    setBusyMode("combine");
+    setBusy(true);
+    try {
+      const startIso = new Date(periodStart).toISOString();
+      const endDate = new Date(periodEnd);
+      endDate.setHours(23, 59, 59, 999);
+      const res = await fetch("/api/combine", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          snapshotIds: combinable.map((s) => s.id),
+          periodStart: startIso,
+          periodEnd: endDate.toISOString(),
+          name: name.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Combine failed (${res.status})`);
+      }
+      const { id } = await res.json();
+      router.push(`/report/${id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setBusy(false);
+      setBusyMode("upload");
+    }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -129,6 +224,7 @@ export default function UploadForm() {
       setError(validation.find((v) => v.field === "dates")?.message ?? "Invalid date range.");
       return;
     }
+    setBusyMode("upload");
     setBusy(true);
     try {
       const fd = new FormData();
@@ -159,6 +255,33 @@ export default function UploadForm() {
       onSubmit={onSubmit}
       className="space-y-6 rounded-lg border border-border bg-surface shadow-soft p-5 sm:p-6"
     >
+      {/* Combinable suggestion */}
+      {combinable && combinable.length > 0 && files.length === 0 && (
+        <div className="rounded-md border border-accent/40 bg-accent-soft px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+          <Layers className="h-5 w-5 text-accent shrink-0" aria-hidden />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-text">
+              {combinable.length} existing report{combinable.length === 1 ? "" : "s"} cover this period
+            </p>
+            <p className="text-xs text-text-muted mt-0.5 truncate">
+              {combinable
+                .map((s) => formatPeriodLabel(s.periodStart, s.periodEnd))
+                .join(" · ")}
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={onBuildFromExisting}
+            disabled={busy}
+            className="shrink-0"
+          >
+            Build from existing
+          </Button>
+        </div>
+      )}
+
       {/* Dropzone */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
@@ -361,7 +484,9 @@ export default function UploadForm() {
           {busy && (
             <>
               <Spinner className="h-3.5 w-3.5" />
-              <span>{PROGRESS_PHASES[phaseIdx]}</span>
+              <span>
+                {(busyMode === "combine" ? COMBINE_PHASES : PROGRESS_PHASES)[phaseIdx]}
+              </span>
             </>
           )}
         </div>

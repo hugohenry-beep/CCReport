@@ -87,6 +87,23 @@ export async function listRecentSnapshots(limit = 20) {
   });
 }
 
+/**
+ * List snapshots whose periods fall (roughly) inside the requested range.
+ * Adds a 1-day buffer on each edge so boundary snapshots are still candidates
+ * for the tiling check; the tiling algorithm itself enforces strict coverage.
+ */
+export async function listSnapshotsInRange(range: { start: Date; end: Date }) {
+  const startLo = new Date(range.start.getTime() - DAY_MS);
+  const endHi = new Date(range.end.getTime() + DAY_MS);
+  return prisma.reportSnapshot.findMany({
+    where: {
+      periodStart: { gte: startLo },
+      periodEnd: { lte: endHi },
+    },
+    orderBy: [{ periodStart: "asc" }, { createdAt: "desc" }],
+  });
+}
+
 export function extractPriorPeriodMetrics(metricsJson: unknown): PeriodMetrics | null {
   if (!metricsJson || typeof metricsJson !== "object") return null;
   const m = metricsJson as Partial<Metrics>;
