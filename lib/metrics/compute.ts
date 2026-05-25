@@ -7,6 +7,7 @@ import type {
   CountryChannelRow,
   CountryKey,
   DateRange,
+  DayOfWeekCountryRow,
   Deal,
   HighValueDeal,
   Lead,
@@ -19,7 +20,7 @@ import type {
   SourceBreakdown,
   StageBreakdown,
 } from "../types";
-import { HIGH_VALUE_THRESHOLD } from "../types";
+import { DAY_OF_WEEK_LABELS, HIGH_VALUE_THRESHOLD } from "../types";
 import { matchStage } from "./matchStage";
 import {
   COUNTRY_ORDER,
@@ -157,6 +158,7 @@ function computeForPeriod(datasets: ParsedDatasets, range: DateRange): PeriodMet
   const bySource = breakdownBySource(leadsInRange);
   const byStage = breakdownByLeadStage(leadsInRange);
   const byCountry = breakdownByCountry(leadsInRange);
+  const byDayOfWeekCountry = breakdownByDayOfWeekAndCountry(leadsInRange);
 
   const adSpend = datasets.campaigns.reduce((s, c) => s + (c.cost || 0), 0);
 
@@ -215,6 +217,7 @@ function computeForPeriod(datasets: ParsedDatasets, range: DateRange): PeriodMet
     enteredContractLiveDeals: enteredContractLive.map(toHighValue),
     paidMediaByCountry,
     unclassifiedCampaigns,
+    byDayOfWeekCountry,
     paidSearchInboundLeads: paidSearchTotals.paidSearchInboundLeads,
     paidSearchSpend: paidSearchTotals.paidSearchSpend,
     paidSearchCostPerLead: paidSearchTotals.paidSearchCostPerLead,
@@ -312,6 +315,52 @@ function breakdownByCountry(leads: Lead[]): CountryBreakdown[] {
   return Array.from(counts.entries())
     .map(([country, count]) => ({ country, count, pct: (count / total) * 100 }))
     .sort((a, b) => b.count - a.count);
+}
+
+const OTHER_COUNTRY_BUCKET = "Other";
+const TOP_COUNTRY_LIMIT = 5;
+
+function breakdownByDayOfWeekAndCountry(leads: Lead[]): DayOfWeekCountryRow[] {
+  const dated = leads.filter((l) => l.createDate != null);
+  if (dated.length === 0) return [];
+
+  const totalByCountry = new Map<string, number>();
+  for (const l of dated) {
+    const key = l.country ?? OTHER_COUNTRY_BUCKET;
+    totalByCountry.set(key, (totalByCountry.get(key) ?? 0) + 1);
+  }
+  const topCountries = Array.from(totalByCountry.entries())
+    .filter(([k]) => k !== OTHER_COUNTRY_BUCKET)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, TOP_COUNTRY_LIMIT)
+    .map(([k]) => k);
+  const topSet = new Set(topCountries);
+
+  // Build seed rows (Mon..Sun) so days with zero leads still render as empty bars.
+  const rows: DayOfWeekCountryRow[] = DAY_OF_WEEK_LABELS.map((day) => ({
+    day,
+    total: 0,
+    byCountry: Object.fromEntries(
+      [...topCountries, OTHER_COUNTRY_BUCKET].map((c) => [c, 0]),
+    ),
+  }));
+
+  for (const l of dated) {
+    const utcDow = l.createDate!.getUTCDay(); // 0=Sun..6=Sat
+    const idx = utcDow === 0 ? 6 : utcDow - 1; // map to Mon..Sun
+    const row = rows[idx];
+    const bucket = l.country && topSet.has(l.country) ? l.country : OTHER_COUNTRY_BUCKET;
+    row.byCountry[bucket] = (row.byCountry[bucket] ?? 0) + 1;
+    row.total += 1;
+  }
+
+  // Drop the Other bucket entirely if nothing fell into it across the week.
+  const otherTotal = rows.reduce((s, r) => s + (r.byCountry[OTHER_COUNTRY_BUCKET] ?? 0), 0);
+  if (otherTotal === 0) {
+    for (const r of rows) delete r.byCountry[OTHER_COUNTRY_BUCKET];
+  }
+
+  return rows;
 }
 
 const STAGE_AGGREGATIONS: { label: string; pairs: { name: string; pipeline: string }[] }[] = [

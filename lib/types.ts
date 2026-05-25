@@ -94,6 +94,15 @@ export interface CountryBreakdown {
   pct: number;
 }
 
+export const DAY_OF_WEEK_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+export type DayOfWeekLabel = (typeof DAY_OF_WEEK_LABELS)[number];
+
+export interface DayOfWeekCountryRow {
+  day: DayOfWeekLabel;
+  total: number;
+  byCountry: Record<string, number>;
+}
+
 export interface HighValueDeal {
   dealName: string;
   company: string;
@@ -182,6 +191,7 @@ export interface PeriodMetrics {
   enteredContractLiveDeals: HighValueDeal[];
   paidMediaByCountry?: CountryChannelRow[];
   unclassifiedCampaigns?: string[];
+  byDayOfWeekCountry?: DayOfWeekCountryRow[];
 
   // Narrative-recap extensions
   paidSearchInboundLeads: number;
