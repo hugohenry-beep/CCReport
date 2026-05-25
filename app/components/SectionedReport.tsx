@@ -4,7 +4,10 @@ import { useMemo } from "react";
 import type { Metrics } from "@/lib/types";
 import { BreakdownBarChart } from "./charts/BreakdownBarChart";
 import { ComparisonBarChart } from "./charts/ComparisonBarChart";
+import { StackedBarChart } from "./charts/StackedBarChart";
 import { fmtMoney, fmtNumber } from "@/lib/render/format";
+
+const DAY_OF_WEEK_SECTION_TITLE = "Inbound leads by day of week";
 
 interface Section {
   id: string;
@@ -74,8 +77,18 @@ function colorDeltaCells(html: string): string {
   );
 }
 
-export function deriveSectionTitles(bodyHtml: string): { id: string; title: string }[] {
-  return splitByH2(bodyHtml).sections.map(({ id, title }) => ({ id, title }));
+export function deriveSectionTitles(
+  bodyHtml: string,
+  metrics?: Metrics,
+): { id: string; title: string }[] {
+  const titles = splitByH2(bodyHtml).sections.map(({ id, title }) => ({ id, title }));
+  if ((metrics?.current.byDayOfWeekCountry?.length ?? 0) > 0) {
+    titles.push({
+      id: slugify(DAY_OF_WEEK_SECTION_TITLE),
+      title: DAY_OF_WEEK_SECTION_TITLE,
+    });
+  }
+  return titles;
 }
 
 export default function SectionedReport({ bodyHtml, metrics }: SectionedReportProps) {
@@ -105,6 +118,23 @@ export default function SectionedReport({ bodyHtml, metrics }: SectionedReportPr
           </div>
         </section>
       ))}
+      {(c.byDayOfWeekCountry?.length ?? 0) > 0 && (
+        <section
+          id={slugify(DAY_OF_WEEK_SECTION_TITLE)}
+          className="scroll-mt-20 pt-2"
+        >
+          <h2 className="font-display text-xl sm:text-2xl font-semibold tracking-tight mt-6 mb-2 pb-1 border-b border-border">
+            {DAY_OF_WEEK_SECTION_TITLE}
+          </h2>
+          <div className="mb-4">
+            <StackedBarChart
+              title="Leads by day of week"
+              description="Bars show daily lead volume; segments are colored by country (top 5 + Other)."
+              data={c.byDayOfWeekCountry!}
+            />
+          </div>
+        </section>
+      )}
     </article>
   );
 

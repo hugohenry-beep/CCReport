@@ -91,7 +91,10 @@ export default function ReportClient({
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [info, setInfo] = useState<string | null>(null);
 
-  const sections = useMemo(() => deriveSectionTitles(initialHtml), [initialHtml]);
+  const sections = useMemo(
+    () => deriveSectionTitles(initialHtml, metrics),
+    [initialHtml, metrics],
+  );
 
   async function loadNarrative({ force = false }: { force?: boolean } = {}) {
     if (narrativeHtml && !force) return;
