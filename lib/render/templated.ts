@@ -1,3 +1,4 @@
+import { deriveCountryRollups, describeCountryRollups } from "../metrics/countryRollups";
 import type { Metrics, PeriodMetrics } from "../types";
 import { delta, deltaMoney, fmtDate, fmtDateRange, fmtMoney, fmtNumber, fmtPct } from "./format";
 
@@ -58,6 +59,10 @@ export function renderTemplatedMarkdown(m: Metrics): string {
   lines.push(``);
 
   // 3b. Country breakdown
+  const countryRollups = deriveCountryRollups(c.byCountry);
+  const priorCountryRollups = new Map(
+    deriveCountryRollups(p?.byCountry).map((r) => [r.country, r.count]),
+  );
   lines.push(`## Inbound leads by country`);
   lines.push(``);
   appendBreakdownTable(lines, {
@@ -67,7 +72,18 @@ export function renderTemplatedMarkdown(m: Metrics): string {
     priorRows: p?.byCountry,
     hasPrior: p != null,
     keyOf: (r) => r.country,
+    pinnedRows: countryRollups.map((r) => ({
+      key: r.country,
+      count: r.count,
+      pct: r.pct,
+      priorCount: priorCountryRollups.get(r.country) ?? null,
+    })),
   });
+  const countryRollupNote = describeCountryRollups(countryRollups, (l) => `**${l}**`);
+  if (countryRollupNote) {
+    lines.push(``);
+    lines.push(`_${countryRollupNote}_`);
+  }
   lines.push(``);
 
   // 4. Spend vs results
@@ -169,6 +185,14 @@ function breakdownDelta(curr: number, prior: number, hasComparablePrior: boolean
   return `${arrow} ${sign}${change.toFixed(1)}%`;
 }
 
+interface PinnedBreakdownRow {
+  key: string;
+  count: number;
+  pct: number;
+  /** Prior-period count; null is treated as 0, same as a missing key. */
+  priorCount: number | null;
+}
+
 function appendBreakdownTable<T extends { count: number; pct: number }>(
   lines: string[],
   opts: {
@@ -178,9 +202,12 @@ function appendBreakdownTable<T extends { count: number; pct: number }>(
     priorRows: T[] | undefined;
     hasPrior: boolean;
     keyOf: (row: T) => string;
+    /** Roll-up rows rendered after, and visually distinct from, currentRows. */
+    pinnedRows?: PinnedBreakdownRow[];
   },
 ): void {
-  if (opts.currentRows.length === 0) {
+  const pinned = opts.pinnedRows ?? [];
+  if (opts.currentRows.length === 0 && pinned.length === 0) {
     lines.push(opts.emptyMessage);
     return;
   }
@@ -193,6 +220,16 @@ function appendBreakdownTable<T extends { count: number; pct: number }>(
     const prior = priorCounts.get(key) ?? 0;
     lines.push(
       `| ${key} | ${fmtNumber(row.count)} | ${fmtPct(row.pct)} | ${
+        hasComparablePrior ? fmtNumber(prior) : "—"
+      } | ${breakdownDelta(row.count, prior, hasComparablePrior)} |`,
+    );
+  }
+  // The delta cell stays unstyled on purpose: colorDeltaCells() in
+  // SectionedReport.tsx only matches a bare <td> with no child tags.
+  for (const row of pinned) {
+    const prior = row.priorCount ?? 0;
+    lines.push(
+      `| **${row.key}** _(roll-up)_ | **${fmtNumber(row.count)}** | **${fmtPct(row.pct)}** | ${
         hasComparablePrior ? fmtNumber(prior) : "—"
       } | ${breakdownDelta(row.count, prior, hasComparablePrior)} |`,
     );
