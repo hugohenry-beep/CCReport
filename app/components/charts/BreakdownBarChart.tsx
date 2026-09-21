@@ -17,9 +17,15 @@ interface BreakdownBarChartProps {
   title?: string;
   description?: string;
   data: { label: string; current: number; prior?: number }[];
+  /**
+   * Summary rows always rendered after `data`, in their own neutral color.
+   * Excluded from the "Other" collapse and its arithmetic — they are roll-ups of
+   * rows already in `data`, so folding them in would double-count.
+   */
+  pinned?: { label: string; current: number; prior?: number }[];
   /** Optional accent rotation for distinct bar colors. */
   rotateColors?: boolean;
-  /** Max bars to render — extra rows are collapsed into "Other". */
+  /** Max bars to render for `data` — extra rows are collapsed into "Other". */
   maxBars?: number;
 }
 
@@ -32,14 +38,17 @@ const BAR_COLORS = [
   "var(--chart-4)",
 ];
 
+const PINNED_COLOR = "var(--text-muted)";
+
 export function BreakdownBarChart({
   title,
   description,
   data,
+  pinned = [],
   rotateColors = false,
   maxBars = 8,
 }: BreakdownBarChartProps) {
-  if (!data.length) return null;
+  if (!data.length && !pinned.length) return null;
   let rows = data.slice();
   if (rows.length > maxBars) {
     const head = rows.slice(0, maxBars - 1);
@@ -51,6 +60,8 @@ export function BreakdownBarChart({
     });
     rows = head;
   }
+  const dataRowCount = rows.length;
+  rows = rows.concat(pinned);
   const height = Math.max(160, rows.length * 36 + 40);
   return (
     <ChartCard title={title} description={description}>
@@ -94,7 +105,13 @@ export function BreakdownBarChart({
             {rows.map((_, i) => (
               <Cell
                 key={i}
-                fill={rotateColors ? BAR_COLORS[i % BAR_COLORS.length] : "var(--chart-1)"}
+                fill={
+                  i >= dataRowCount
+                    ? PINNED_COLOR
+                    : rotateColors
+                    ? BAR_COLORS[i % BAR_COLORS.length]
+                    : "var(--chart-1)"
+                }
               />
             ))}
             <LabelList

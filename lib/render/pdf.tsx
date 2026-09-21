@@ -1,5 +1,6 @@
 import { Document, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import * as React from "react";
+import { deriveCountryRollups, describeCountryRollups } from "../metrics/countryRollups";
 import type { Metrics } from "../types";
 import { fmtDate, fmtDateRange, fmtMoney, fmtNumber, fmtPct } from "./format";
 
@@ -14,8 +15,19 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row" },
   th: { flexGrow: 1, flexBasis: 0, padding: 4, borderRight: "1 solid #d4d7dd", borderBottom: "1 solid #d4d7dd", backgroundColor: "#f4f5f8", fontWeight: 700 },
   td: { flexGrow: 1, flexBasis: 0, padding: 4, borderRight: "1 solid #d4d7dd", borderBottom: "1 solid #d4d7dd" },
+  tdRollup: { fontWeight: 700, backgroundColor: "#f4f5f8", borderTop: "1 solid #9aa1ad" },
+  rollupNote: { fontSize: 8, color: "#5a6370", marginTop: -2, marginBottom: 6 },
   small: { fontSize: 9, color: "#5a6370" },
 });
+
+function deltaText(count: number, prior: number, hasComparablePrior: boolean): string {
+  if (!hasComparablePrior) return "—";
+  if (prior === 0) return count > 0 ? "(new)" : "→ 0";
+  const change = ((count - prior) / prior) * 100;
+  const arrow = change > 0 ? "▲" : change < 0 ? "▼" : "→";
+  const sign = change > 0 ? "+" : "";
+  return `${arrow} ${sign}${change.toFixed(1)}%`;
+}
 
 function BreakdownTable<T extends { count: number; pct: number }>(props: {
   keyLabel: string;
@@ -24,8 +36,11 @@ function BreakdownTable<T extends { count: number; pct: number }>(props: {
   priorRows: T[] | undefined;
   hasPrior: boolean;
   keyOf: (row: T) => string;
+  /** Roll-up rows rendered after, and visually distinct from, currentRows. */
+  pinnedRows?: { key: string; count: number; pct: number; priorCount: number | null }[];
 }) {
-  if (props.currentRows.length === 0) {
+  const pinned = props.pinnedRows ?? [];
+  if (props.currentRows.length === 0 && pinned.length === 0) {
     return <Text style={styles.p}>{props.emptyMessage}</Text>;
   }
   const hasComparablePrior = props.hasPrior && props.priorRows != null;
@@ -42,22 +57,29 @@ function BreakdownTable<T extends { count: number; pct: number }>(props: {
       {props.currentRows.map((r, i) => {
         const key = props.keyOf(r);
         const prior = priorMap.get(key) ?? 0;
-        let deltaLabel: string;
-        if (!hasComparablePrior) deltaLabel = "—";
-        else if (prior === 0) deltaLabel = r.count > 0 ? "(new)" : "→ 0";
-        else {
-          const change = ((r.count - prior) / prior) * 100;
-          const arrow = change > 0 ? "▲" : change < 0 ? "▼" : "→";
-          const sign = change > 0 ? "+" : "";
-          deltaLabel = `${arrow} ${sign}${change.toFixed(1)}%`;
-        }
         return (
           <View style={styles.row} key={i}>
             <Text style={styles.td}>{key}</Text>
             <Text style={styles.td}>{fmtNumber(r.count)}</Text>
             <Text style={styles.td}>{fmtPct(r.pct)}</Text>
             <Text style={styles.td}>{hasComparablePrior ? fmtNumber(prior) : "—"}</Text>
-            <Text style={styles.td}>{deltaLabel}</Text>
+            <Text style={styles.td}>{deltaText(r.count, prior, hasComparablePrior)}</Text>
+          </View>
+        );
+      })}
+      {pinned.map((r, i) => {
+        const prior = r.priorCount ?? 0;
+        return (
+          <View style={styles.row} key={`pinned-${i}`} wrap={false}>
+            <Text style={[styles.td, styles.tdRollup]}>{r.key} (roll-up)</Text>
+            <Text style={[styles.td, styles.tdRollup]}>{fmtNumber(r.count)}</Text>
+            <Text style={[styles.td, styles.tdRollup]}>{fmtPct(r.pct)}</Text>
+            <Text style={[styles.td, styles.tdRollup]}>
+              {hasComparablePrior ? fmtNumber(prior) : "—"}
+            </Text>
+            <Text style={[styles.td, styles.tdRollup]}>
+              {deltaText(r.count, prior, hasComparablePrior)}
+            </Text>
           </View>
         );
       })}
@@ -68,6 +90,11 @@ function BreakdownTable<T extends { count: number; pct: number }>(props: {
 function ReportPdf({ metrics }: { metrics: Metrics }) {
   const c = metrics.current;
   const p = metrics.prior;
+  const countryRollups = deriveCountryRollups(c.byCountry);
+  const priorCountryRollups = new Map(
+    deriveCountryRollups(p?.byCountry).map((r) => [r.country, r.count]),
+  );
+  const countryRollupNote = describeCountryRollups(countryRollups);
 
   const cmpLabel =
     metrics.comparisonInfo.source === "current_upload"
@@ -122,7 +149,16 @@ function ReportPdf({ metrics }: { metrics: Metrics }) {
           priorRows={p?.byCountry}
           hasPrior={p != null}
           keyOf={(r) => r.country}
+          pinnedRows={countryRollups.map((r) => ({
+            key: r.country,
+            count: r.count,
+            pct: r.pct,
+            priorCount: priorCountryRollups.get(r.country) ?? null,
+          }))}
         />
+        {countryRollupNote ? (
+          <Text style={styles.rollupNote}>{countryRollupNote}</Text>
+        ) : null}
 
         <Text style={styles.h2}>Budget spend vs results</Text>
         <View style={styles.table}>

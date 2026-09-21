@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { deriveCountryRollups, describeCountryRollups } from "@/lib/metrics/countryRollups";
 import type { Metrics } from "@/lib/types";
 import { BreakdownBarChart } from "./charts/BreakdownBarChart";
 import { ComparisonBarChart } from "./charts/ComparisonBarChart";
@@ -206,14 +207,24 @@ export default function SectionedReport({ bodyHtml, metrics }: SectionedReportPr
       );
     }
     if (sectionId === slugify("Inbound leads by country") && (c.byCountry?.length ?? 0) > 0) {
+      const rollups = deriveCountryRollups(c.byCountry);
+      const priorRollups = new Map(
+        deriveCountryRollups(p?.byCountry).map((r) => [r.country, r.count]),
+      );
       return (
         <div className="mb-4">
           <BreakdownBarChart
             title="Leads by country"
+            description={describeCountryRollups(rollups) ?? undefined}
             data={c.byCountry.map((r) => ({
               label: r.country,
               current: r.count,
               prior: p?.byCountry?.find((x) => x.country === r.country)?.count,
+            }))}
+            pinned={rollups.map((r) => ({
+              label: r.country,
+              current: r.count,
+              prior: priorRollups.get(r.country),
             }))}
             rotateColors
           />
