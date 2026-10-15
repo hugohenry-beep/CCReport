@@ -17,6 +17,7 @@ export type FileKind =
   | "hubspotLeadQO"
   | "hubspotLeadVolume"
   | "hubspotTotalVolume"
+  | "hubspotLeadPipeline"
   | "hubspotClosedWon"
   | "hubspotRegional"
   | "unrecognized";
@@ -146,6 +147,9 @@ export type RegionGroup = "USA & Canada" | "Europe & ROW" | "LATAM" | "Australia
 
 export interface RegionStageCounts {
   newAttempting: number;
+  // Absent on snapshots saved before the "Contacted" lead stage was bucketed
+  // (Oct 2026); those leads were counted under `other`.
+  contacted?: number;
   engaged: number;
   qualified: number;
   notPursuing: number;

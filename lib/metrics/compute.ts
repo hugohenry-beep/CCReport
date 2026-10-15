@@ -165,6 +165,9 @@ function computeForPeriod(datasets: ParsedDatasets, range: DateRange): PeriodMet
   const { rows: paidMediaByCountry, unclassified: unclassifiedCampaigns } =
     buildPaidMediaByCountry(datasets.campaigns, leadsInRangeAll);
 
+  // The pipe-created export spans ~10 weeks (it held only last week before the
+  // Oct 2026 dashboard rework), so every use of it is limited to deals created
+  // in the period.
   const dealsInRange = datasets.paidPipeDeals.filter((d) => inRange(d.createDate, range));
   const totalDealValue = dealsInRange.reduce((s, d) => s + (d.amount ?? 0), 0);
 
@@ -175,10 +178,12 @@ function computeForPeriod(datasets: ParsedDatasets, range: DateRange): PeriodMet
     .map(toHighValue)
     .sort((a, b) => b.amount - a.amount);
 
+  // Lead-stage / regional rows are dated by lead create date; filtering them too
+  // keeps this week's deals out of a prior period derived from the same upload.
   const stageDealsForCounts = mergeDealLists([
-    datasets.paidPipeDeals,
-    datasets.leadStageDeals,
-    datasets.regionalDeals,
+    dealsInRange,
+    datasets.leadStageDeals.filter((d) => inRange(d.createDate, range)),
+    datasets.regionalDeals.filter((d) => inRange(d.createDate, range)),
   ]);
 
   const demoCount = stageDealsForCounts.filter((d) => matchStage(d.dealStage, "demo")).length;
@@ -199,7 +204,7 @@ function computeForPeriod(datasets: ParsedDatasets, range: DateRange): PeriodMet
     ? ALL_REGION_GROUPS.filter((g) => !byRegionGroup.some((r) => r.group === g && r.count > 0))
     : [];
   const arrCreated = buildArrCreated(datasets, range);
-  const advancedStageDeals = buildAdvancedStageDeals(datasets, range);
+  const advancedStageDeals = buildAdvancedStageDeals(datasets, dealsInRange, range);
 
   return {
     inboundLeadCount,
@@ -372,6 +377,13 @@ const STAGE_AGGREGATIONS: { label: string; pairs: { name: string; pipeline: stri
     ],
   },
   {
+    label: "Contacted / Reached",
+    pairs: [
+      { name: "contacted", pipeline: "cc - inbound & lead gen" },
+      { name: "contacted / reached", pipeline: "cc - new leads" },
+    ],
+  },
+  {
     label: "Disqualified",
     pairs: [
       { name: "disqualified", pipeline: "cc - inbound & lead gen" },
@@ -523,8 +535,16 @@ function buildPaidSearchTotals(
   };
 }
 
-function emptyRegionStages(): RegionStageCounts {
-  return { newAttempting: 0, engaged: 0, qualified: 0, notPursuing: 0, disqualified: 0, other: 0 };
+function emptyRegionStages(): Required<RegionStageCounts> {
+  return {
+    newAttempting: 0,
+    contacted: 0,
+    engaged: 0,
+    qualified: 0,
+    notPursuing: 0,
+    disqualified: 0,
+    other: 0,
+  };
 }
 
 function stageBucketFromLabel(label: string | null): keyof RegionStageCounts {
@@ -532,6 +552,8 @@ function stageBucketFromLabel(label: string | null): keyof RegionStageCounts {
   switch (label) {
     case "New / Attempting":
       return "newAttempting";
+    case "Contacted / Reached":
+      return "contacted";
     case "Engaged":
       return "engaged";
     case "Qualified":
@@ -550,7 +572,7 @@ function buildRegionGroupBreakdown(leadsInRange: Lead[]): RegionGroupBreakdown[]
     count: number;
     paidSearchLeads: number;
     directOrganicLeads: number;
-    stages: RegionStageCounts;
+    stages: Required<RegionStageCounts>;
     countries: Map<string, number>;
   }>();
   const seen = new Set<string>();
@@ -582,6 +604,7 @@ function buildRegionGroupBreakdown(leadsInRange: Lead[]): RegionGroupBreakdown[]
   for (const [group, entry] of byGroup.entries()) {
     const stagePcts: RegionStageCounts = {
       newAttempting: pctOf(entry.stages.newAttempting, entry.count),
+      contacted: pctOf(entry.stages.contacted, entry.count),
       engaged: pctOf(entry.stages.engaged, entry.count),
       qualified: pctOf(entry.stages.qualified, entry.count),
       notPursuing: pctOf(entry.stages.notPursuing, entry.count),
@@ -622,11 +645,15 @@ function buildArrCreated(datasets: ParsedDatasets, range: DateRange): number {
   return total;
 }
 
-function buildAdvancedStageDeals(datasets: ParsedDatasets, range: DateRange): AdvancedStageDeal[] {
+function buildAdvancedStageDeals(
+  datasets: ParsedDatasets,
+  pipeDealsInRange: Deal[],
+  range: DateRange,
+): AdvancedStageDeal[] {
   const merged = mergeDealLists([
     datasets.closedWonDeals,
     datasets.regionalDeals,
-    datasets.paidPipeDeals,
+    pipeDealsInRange,
   ]);
   const matches = merged.filter((d) => {
     const refDate = d.closeDate ?? d.createDate;

@@ -89,7 +89,7 @@ export function renderTemplatedMarkdown(m: Metrics): string {
   // 4. Spend vs results
   lines.push(`## Budget spend vs results`);
   lines.push(``);
-  lines.push(`Total Google Ads spend in this period was **${fmtMoney(c.adSpend)}**, which produced **${fmtNumber(c.inboundLeadCount)} inbound leads** and **${fmtMoney(c.totalDealValue)} of pipeline value**.`);
+  lines.push(`Total Google Ads spend in this period was **${fmtMoney(c.adSpend)}**, which produced **${fmtNumber(c.inboundLeadCount)} inbound leads**. **${fmtMoney(c.totalDealValue)}** of new pipeline was created in the period.`);
   lines.push(``);
   lines.push(`| Metric | Current | Prior |`);
   lines.push(`| --- | ---: | ---: |`);

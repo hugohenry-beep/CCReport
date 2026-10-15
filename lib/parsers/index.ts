@@ -1,3 +1,4 @@
+import { classifyFilename } from "../classifyClient";
 import type { Campaign, Deal, FileKind, FileMeta, Lead, ParsedDatasets } from "../types";
 import { parseGoogleAdsCampaigns } from "./googleAdsCampaigns";
 import { parseHubspotClosedWon } from "./hubspotClosedWon";
@@ -7,25 +8,12 @@ import { parseHubspotLeadVolume } from "./hubspotLeadVolume";
 import { parseHubspotPaidPipe } from "./hubspotPaidPipe";
 import { parseHubspotRegional } from "./hubspotRegional";
 import { parseHubspotTotalVolume } from "./hubspotTotalVolume";
+import { detailSheetName, readWorkbook, rowsFromSheet } from "./sheetUtils";
 import type { NamedFile } from "./unzip";
 import { isXlsx, isZip, unzipBuffer } from "./unzip";
 
 export function classify(filename: string): FileKind {
-  const n = filename.toLowerCase();
-  if (n.includes("campaign report") || (n.includes("campaign") && n.includes(".xlsx") && !n.includes("hubspot"))) {
-    return "googleAdsCampaigns";
-  }
-  if (!n.startsWith("hubspot")) {
-    if (n.includes("campaign")) return "googleAdsCampaigns";
-  }
-  if (n.includes("paid-pipe-created")) return "hubspotPaidPipe";
-  if (n.includes("cc-inbound-last-week-stage")) return "hubspotLeadStage";
-  if (n.includes("cc-inbound-last-week-qo")) return "hubspotLeadQO";
-  if (n.includes("cc-inbound-lead-volume")) return "hubspotLeadVolume";
-  if (n.includes("cc-inbound-total-lead-volum")) return "hubspotTotalVolume";
-  if (n.includes("total-closed-won")) return "hubspotClosedWon";
-  if (n.includes("usa-canada") || n.includes("europe-and-row")) return "hubspotRegional";
-  return "unrecognized";
+  return classifyFilename(filename);
 }
 
 export function expandUploads(files: NamedFile[]): NamedFile[] {
@@ -109,6 +97,20 @@ export function parseAll(uploads: NamedFile[]): ParsedDatasets {
             kind,
             rowCount: l.length,
             note: hasSource ? "with source attribution" : "no source column",
+          });
+          break;
+        }
+        case "hubspotLeadPipeline": {
+          // Recognized but not merged: its "Lead Source" is a different
+          // property from "Original Traffic Source" and disagrees on ~1 in 5
+          // leads, so it would skew paid-search counts vs. past reports.
+          const wb = readWorkbook(f.buffer);
+          const rowCount = rowsFromSheet(wb, detailSheetName(wb)).length;
+          files.push({
+            name: f.name,
+            kind,
+            rowCount,
+            note: "Lead Source + deal amount — not used; attribution uses Original Traffic Source",
           });
           break;
         }
