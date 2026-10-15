@@ -17,7 +17,7 @@
  *     region groups, one spotlight region with its constituent countries.
  *  3. Qualification rate by region group: USA & Canada / Europe & ROW /
  *     LATAM / Australia. Each line: "X% qualified out (Y% new/attempting,
- *     Z% engaged, A% qualified, B% not pursuing)".
+ *     C% contacted/reached, Z% engaged, A% qualified, B% not pursuing)".
  *  4. Advanced-stage leads: company + country bullets for deals at
  *     Contract Live / Onboarding / Achieving Impact stages.
  *  5. Closing line: "Pipeline value of $X and $Y of ARR created."
@@ -189,6 +189,8 @@ function qualificationLine(row: RegionGroupBreakdown): string {
   const tail: string[] = [];
   const fmt = (label: string, val: number) => `${val.toFixed(1)}% ${label}`;
   if (row.stagePcts.newAttempting > 0) tail.push(fmt("new / attempting", row.stagePcts.newAttempting));
+  const contacted = row.stagePcts.contacted ?? 0;
+  if (contacted > 0) tail.push(fmt("contacted / reached", contacted));
   if (row.stagePcts.engaged > 0) tail.push(fmt("engaged", row.stagePcts.engaged));
   if (row.stagePcts.qualified > 0) tail.push(fmt("qualified", row.stagePcts.qualified));
   if (row.stagePcts.notPursuing > 0) tail.push(fmt("not pursuing", row.stagePcts.notPursuing));
@@ -229,11 +231,11 @@ function renderClosing(lines: string[], facts: NarrativeFacts): void {
   lines.push("");
   const { pipelineValue, arrCreated, pipelineFormatted, arrFormatted } = facts.closing;
   if (pipelineValue === 0 && arrCreated === 0) {
-    lines.push("No new pipeline or ARR was created from inbound leads this period.");
+    lines.push("No new pipeline or ARR was created this period.");
   } else if (arrCreated === 0) {
-    lines.push(`The inbound leads generated this period produced a pipeline value of ${pipelineFormatted} and no ARR yet from this period's leads.`);
+    lines.push(`This period created ${pipelineFormatted} of new pipeline and no ARR yet.`);
   } else {
-    lines.push(`The inbound leads generated this period produced a pipeline value of ${pipelineFormatted} and ${arrFormatted} of ARR created.`);
+    lines.push(`This period created ${pipelineFormatted} of new pipeline and ${arrFormatted} of ARR.`);
   }
   pushWhitelist(facts, pipelineFormatted, arrFormatted);
   lines.push("");
@@ -268,6 +270,7 @@ function pushFigureTokens(facts: NarrativeFacts, fig: HeadlineFigure): void {
 function pushQualificationTokens(facts: NarrativeFacts, row: RegionGroupBreakdown): void {
   facts.numericWhitelist.push(`${row.qualifiedOutPct.toFixed(1)}%`);
   facts.numericWhitelist.push(`${row.stagePcts.newAttempting.toFixed(1)}%`);
+  facts.numericWhitelist.push(`${(row.stagePcts.contacted ?? 0).toFixed(1)}%`);
   facts.numericWhitelist.push(`${row.stagePcts.engaged.toFixed(1)}%`);
   facts.numericWhitelist.push(`${row.stagePcts.qualified.toFixed(1)}%`);
   facts.numericWhitelist.push(`${row.stagePcts.notPursuing.toFixed(1)}%`);

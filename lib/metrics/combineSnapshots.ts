@@ -247,8 +247,16 @@ function mergeAdvancedStageDeals(deals: AdvancedStageDeal[]): AdvancedStageDeal[
   return Array.from(seen.values()).sort((a, b) => b.amount - a.amount);
 }
 
-function emptyRegionStages(): RegionStageCounts {
-  return { newAttempting: 0, engaged: 0, qualified: 0, notPursuing: 0, disqualified: 0, other: 0 };
+function emptyRegionStages(): Required<RegionStageCounts> {
+  return {
+    newAttempting: 0,
+    contacted: 0,
+    engaged: 0,
+    qualified: 0,
+    notPursuing: 0,
+    disqualified: 0,
+    other: 0,
+  };
 }
 
 function pctOf(n: number, denom: number): number {
@@ -261,7 +269,7 @@ function mergeRegionGroups(periods: PeriodMetrics[]): RegionGroupBreakdown[] {
     count: number;
     paidSearchLeads: number;
     directOrganicLeads: number;
-    stages: RegionStageCounts;
+    stages: Required<RegionStageCounts>;
     countries: Map<string, number>;
   };
   const byGroup = new Map<RegionGroup, Acc>();
@@ -279,6 +287,7 @@ function mergeRegionGroups(periods: PeriodMetrics[]): RegionGroupBreakdown[] {
       acc.paidSearchLeads += row.paidSearchLeads;
       acc.directOrganicLeads += row.directOrganicLeads;
       acc.stages.newAttempting += row.stages.newAttempting;
+      acc.stages.contacted += row.stages.contacted ?? 0;
       acc.stages.engaged += row.stages.engaged;
       acc.stages.qualified += row.stages.qualified;
       acc.stages.notPursuing += row.stages.notPursuing;
@@ -296,6 +305,7 @@ function mergeRegionGroups(periods: PeriodMetrics[]): RegionGroupBreakdown[] {
   for (const [group, acc] of byGroup.entries()) {
     const stagePcts: RegionStageCounts = {
       newAttempting: pctOf(acc.stages.newAttempting, acc.count),
+      contacted: pctOf(acc.stages.contacted, acc.count),
       engaged: pctOf(acc.stages.engaged, acc.count),
       qualified: pctOf(acc.stages.qualified, acc.count),
       notPursuing: pctOf(acc.stages.notPursuing, acc.count),

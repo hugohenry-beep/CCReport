@@ -35,11 +35,13 @@ A Next.js web app that ingests HubSpot dashboard exports and Google Ads campaign
 
 | Filename contains              | Used for                                                       |
 | ------------------------------ | -------------------------------------------------------------- |
-| `paid-pipe-created`            | Deals with amounts — drives **>$15k callouts** and stage counts |
+| `pipe-created`                 | All new-business deals (multi-week; filtered to deals created in the period) — drives **pipeline value**, **>$15k callouts** and stage counts. Was `paid-pipe-created` before the Oct 2026 dashboard rework |
 | `cc-inbound-last-week-stage`   | Inbound deal-stage breakdown                                   |
 | `cc-inbound-last-week-qo`      | Lead-stage funnel                                              |
 | `cc-inbound-lead-volume`       | Multi-week lead volume time series                             |
+| `cc-inbound-lead-volume-vs-p`  | Recognized but **not used**: its "Lead Source" differs from "Original Traffic Source", which stays the attribution source |
 | `cc-inbound-total-lead-volum`  | Lead-source attribution (and country breakdown)                |
+| `cc-inbound-top-2-weekly-lea` / `cc-inbound-weekly-lead-volu` | Country per lead (copies / subsets of the total-lead-volume country export; merged by Lead ID) |
 | `total-closed-won`             | Deals that **entered "Contract is live"** in the period        |
 | `usa-canada` / `europe-and-row`| Optional regional cuts                                         |
 | `Campaign report`              | Google Ads spend per campaign                                  |
